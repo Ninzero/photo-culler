@@ -8,7 +8,7 @@
 import SwiftUI
 
 struct ContentView: View {
-    @State private var viewModel = PhotoCullerViewModel()
+    @Environment(PhotoCullerViewModel.self) private var viewModel
 
     var body: some View {
         Group {
@@ -25,4 +25,5 @@ struct ContentView: View {
 
 #Preview {
     ContentView()
+        .environment(PhotoCullerViewModel())
 }
