@@ -8,14 +8,21 @@
 import SwiftUI
 
 struct ContentView: View {
+    @State private var viewModel = PhotoCullerViewModel()
+
     var body: some View {
-        VStack {
-            Image(systemName: "globe")
-                .imageScale(.large)
-                .foregroundStyle(.tint)
-            Text("Hello, world!")
+        Group {
+            if viewModel.hasLoadedFolder {
+                VStack {
+                    Text("Loaded \(viewModel.photoCount) photos from folder.")
+                        .font(.title2)
+                }
+            } else {
+                FolderSelectionView { url in
+                    viewModel.loadFolder(url: url)
+                }
+            }
         }
-        .padding()
     }
 }
 

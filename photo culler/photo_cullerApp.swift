@@ -13,5 +13,6 @@ struct photo_cullerApp: App {
         WindowGroup {
             ContentView()
         }
+        .defaultSize(width: 1200, height: 800)
     }
 }
