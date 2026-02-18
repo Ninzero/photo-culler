@@ -32,5 +32,20 @@ struct PhotoReviewView: View {
                 onRate: { rating in viewModel.rateCurrent(rating) }
             )
         }
+        .alert("All Photos Rated", isPresented: $viewModel.showCompletionDialog) {
+            Button("Delete \(viewModel.badCount) Bad Photo(s)", role: .destructive) {
+                viewModel.confirmDeletion()
+            }
+            Button("Cancel", role: .cancel) {
+                viewModel.cancelDeletion()
+            }
+        } message: {
+            Text("\(viewModel.goodCount) good, \(viewModel.badCount) bad.\nDelete all bad photos and their associated files?")
+        }
+        .alert("Deletion Complete", isPresented: $viewModel.showDeletionResult) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(viewModel.deletionResultMessage)
+        }
     }
 }

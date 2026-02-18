@@ -6,6 +6,9 @@ class PhotoCullerViewModel {
     var photos: [PhotoItem] = []
     var folderURL: URL?
     var currentIndex: Int = 0
+    var showCompletionDialog: Bool = false
+    var showDeletionResult: Bool = false
+    var deletionResultMessage: String = ""
 
     var hasLoadedFolder: Bool {
         folderURL != nil
@@ -30,6 +33,18 @@ class PhotoCullerViewModel {
 
     var ratedCount: Int {
         photos.filter { $0.rating != nil }.count
+    }
+
+    var allRated: Bool {
+        !photos.isEmpty && ratedCount == photos.count
+    }
+
+    var goodCount: Int {
+        photos.filter { $0.rating == .good }.count
+    }
+
+    var badCount: Int {
+        photos.filter { $0.rating == .bad }.count
     }
 
     func loadFolder(url: URL) {
@@ -86,8 +101,43 @@ class PhotoCullerViewModel {
 
         AuditLogger.log("RATED: \(photo.id) -> \(rating.rawValue)", in: folderURL)
 
-        if canGoNext {
+        if allRated {
+            showCompletionDialog = true
+        } else if canGoNext {
             goToNext()
         }
+    }
+
+    func confirmDeletion() {
+        guard let folderURL else { return }
+
+        AuditLogger.log("DELETION_CONFIRMED: User confirmed deletion of \(badCount) bad photo(s)", in: folderURL)
+
+        let result = PhotoDeleter.deleteBadPhotos(from: photos, in: folderURL)
+        deletionResultMessage = result.summary
+
+        // Remove bad photos from in-memory state
+        photos.removeAll { $0.rating == .bad }
+
+        // Update persisted ratings (only good photos remain)
+        var remainingRatings: [String: Rating] = [:]
+        for p in photos where p.rating != nil {
+            remainingRatings[p.id] = p.rating
+        }
+        RatingStore.save(remainingRatings, to: folderURL)
+
+        // Adjust currentIndex to stay in bounds
+        if photos.isEmpty {
+            currentIndex = 0
+        } else if currentIndex >= photos.count {
+            currentIndex = photos.count - 1
+        }
+
+        showDeletionResult = true
+    }
+
+    func cancelDeletion() {
+        guard let folderURL else { return }
+        AuditLogger.log("DELETION_CANCELLED: User cancelled deletion", in: folderURL)
     }
 }
