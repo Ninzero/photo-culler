@@ -101,10 +101,16 @@ class PhotoCullerViewModel {
 
         AuditLogger.log("RATED: \(photo.id) -> \(rating.rawValue)", in: folderURL)
 
-        if allRated {
-            showCompletionDialog = true
-        } else if canGoNext {
-            goToNext()
+        let shouldShowCompletion = allRated
+        let shouldAdvance = !allRated && canGoNext
+
+        Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(100))
+            if shouldShowCompletion {
+                showCompletionDialog = true
+            } else if shouldAdvance {
+                goToNext()
+            }
         }
     }
 
