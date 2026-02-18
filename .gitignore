@@ -152,4 +152,4 @@ iOSInjectionProject/
 
 # End of https://www.toptal.com/developers/gitignore/api/macos,swift,xcode,visualstudiocode
 
-example_photos/
+data/
