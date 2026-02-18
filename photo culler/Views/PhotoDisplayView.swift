@@ -1,5 +1,6 @@
 import SwiftUI
 import AppKit
+import ImageIO
 
 struct PhotoDisplayView: View {
     let url: URL?
@@ -38,10 +39,25 @@ struct PhotoDisplayView: View {
             isLoading = true
             loadedImage = nil
             let image = await Task.detached(priority: .userInitiated) {
-                NSImage(contentsOf: url)
+                Self.loadImage(from: url)
             }.value
             loadedImage = image
             isLoading = false
         }
+    }
+
+    // 使用 ImageIO 加载图片，对 RAW 文件直接读取内嵌 JPEG 预览，避免主线程阻塞
+    private static func loadImage(from url: URL) -> NSImage? {
+        guard let source = CGImageSourceCreateWithURL(url as CFURL, nil) else { return nil }
+        let options: [CFString: Any] = [
+            kCGImageSourceCreateThumbnailFromImageIfAbsent: true,
+            kCGImageSourceCreateThumbnailFromImageAlways: false,
+            kCGImageSourceCreateThumbnailWithTransform: true,
+            kCGImageSourceThumbnailMaxPixelSize: 4096
+        ]
+        guard let cgImage = CGImageSourceCreateThumbnailAtIndex(source, 0, options as CFDictionary) else {
+            return nil
+        }
+        return NSImage(cgImage: cgImage, size: .zero)
     }
 }
