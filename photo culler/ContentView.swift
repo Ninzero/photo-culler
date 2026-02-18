@@ -13,10 +13,7 @@ struct ContentView: View {
     var body: some View {
         Group {
             if viewModel.hasLoadedFolder {
-                VStack {
-                    Text("Loaded \(viewModel.photoCount) photos from folder.")
-                        .font(.title2)
-                }
+                PhotoReviewView(viewModel: viewModel)
             } else {
                 FolderSelectionView { url in
                     viewModel.loadFolder(url: url)
