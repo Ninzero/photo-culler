@@ -36,7 +36,23 @@ class PhotoCullerViewModel {
         folderURL = url
         do {
             photos = try PhotoScanner.scan(folderURL: url)
-            currentIndex = 0
+
+            // Load persisted ratings
+            let savedRatings = RatingStore.load(from: url)
+            for (index, photo) in photos.enumerated() {
+                if let rating = savedRatings[photo.id] {
+                    photos[index].rating = rating
+                }
+            }
+
+            // Jump to the first unrated photo
+            if let firstUnrated = photos.firstIndex(where: { $0.rating == nil }) {
+                currentIndex = firstUnrated
+            } else {
+                currentIndex = 0
+            }
+
+            AuditLogger.log("SESSION_START: Loaded folder \(url.lastPathComponent) with \(photos.count) photos, \(savedRatings.count) existing ratings", in: url)
         } catch {
             photos = []
         }
@@ -56,7 +72,20 @@ class PhotoCullerViewModel {
 
     func rateCurrent(_ rating: Rating) {
         guard !photos.isEmpty, currentIndex >= 0, currentIndex < photos.count else { return }
+        guard let folderURL else { return }
+
+        let photo = photos[currentIndex]
         photos[currentIndex].rating = rating
+
+        // Persist ratings
+        var allRatings: [String: Rating] = [:]
+        for p in photos where p.rating != nil {
+            allRatings[p.id] = p.rating
+        }
+        RatingStore.save(allRatings, to: folderURL)
+
+        AuditLogger.log("RATED: \(photo.id) -> \(rating.rawValue)", in: folderURL)
+
         if canGoNext {
             goToNext()
         }
