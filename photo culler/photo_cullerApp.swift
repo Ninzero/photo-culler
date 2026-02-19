@@ -22,6 +22,7 @@ struct photo_cullerApp: App {
                 Button("Delete Bad Photos…") {
                     viewModel.showCompletionDialog = true
                 }
+                .keyboardShortcut("d", modifiers: .command)
                 .disabled(!viewModel.hasLoadedFolder || viewModel.badCount == 0)
             }
         }
