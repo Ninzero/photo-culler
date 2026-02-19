@@ -99,7 +99,8 @@ class PhotoCullerViewModel {
         guard let folderURL else { return }
 
         let photo = photos[currentIndex]
-        photos[currentIndex].rating = rating
+        let newRating: Rating? = photos[currentIndex].rating == rating ? nil : rating
+        photos[currentIndex].rating = newRating
 
         // Persist ratings
         var allRatings: [String: Rating] = [:]
@@ -108,7 +109,9 @@ class PhotoCullerViewModel {
         }
         RatingStore.save(allRatings, to: folderURL)
 
-        AuditLogger.log("RATED: \(photo.id) -> \(rating.rawValue)", in: folderURL)
+        AuditLogger.log("RATED: \(photo.id) -> \(newRating?.rawValue ?? "unrated")", in: folderURL)
+
+        guard newRating != nil else { return }   // 撤销评价时不自动跳转
 
         let shouldShowCompletion = allRated
         let shouldAdvance = !allRated && canGoNext
