@@ -122,5 +122,6 @@ struct ThumbnailStripView: View {
         }
         .frame(width: 120)
         .background(Color(nsColor: .controlBackgroundColor))
+        .shadow(color: .black.opacity(0.18), radius: 8, x: -3, y: 0)
     }
 }
