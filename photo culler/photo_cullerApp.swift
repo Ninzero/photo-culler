@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import AppKit
 
 @main
 struct photo_cullerApp: App {
@@ -20,6 +21,12 @@ struct photo_cullerApp: App {
         }
         .defaultSize(width: 1200, height: 800)
         .commands {
+            CommandGroup(after: .newItem) {
+                Button("Open…") {
+                    openFolder()
+                }
+                .keyboardShortcut("o", modifiers: .command)
+            }
             CommandMenu("Photo") {
                 Button("Delete Bad Photos…") {
                     viewModel.showCompletionDialog = true
@@ -32,6 +39,22 @@ struct photo_cullerApp: App {
         Settings {
             SettingsView()
                 .environment(extensionSettings)
+        }
+    }
+
+    private func openFolder() {
+        let panel = NSOpenPanel()
+        panel.canChooseFiles = false
+        panel.canChooseDirectories = true
+        panel.allowsMultipleSelection = false
+        panel.message = "Select a folder containing photos"
+
+        if panel.runModal() == .OK, let url = panel.url {
+            viewModel.loadFolder(
+                url: url,
+                rawExtensions: extensionSettings.rawExtensions,
+                outputExtensions: extensionSettings.outputExtensions
+            )
         }
     }
 }
