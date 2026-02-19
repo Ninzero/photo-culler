@@ -8,7 +8,7 @@
 import SwiftUI
 
 struct ContentView: View {
-    @Environment(PhotoCullerViewModel.self) private var viewModel
+    @State private var viewModel = PhotoCullerViewModel()
     @Environment(ExtensionSettings.self) private var extensionSettings
 
     var body: some View {
@@ -25,6 +25,8 @@ struct ContentView: View {
                 }
             }
         }
+        .environment(viewModel)
+        .focusedSceneValue(\.viewModel, viewModel)
     }
 }
 

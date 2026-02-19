@@ -8,6 +8,17 @@
 import SwiftUI
 import AppKit
 
+private struct ViewModelFocusedKey: FocusedValueKey {
+    typealias Value = PhotoCullerViewModel
+}
+
+extension FocusedValues {
+    var viewModel: PhotoCullerViewModel? {
+        get { self[ViewModelFocusedKey.self] }
+        set { self[ViewModelFocusedKey.self] = newValue }
+    }
+}
+
 class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
         return true
@@ -17,13 +28,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 @main
 struct photo_cullerApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
-    @State private var viewModel = PhotoCullerViewModel()
     @State private var extensionSettings = ExtensionSettings()
+    @FocusedValue(\.viewModel) private var viewModel
 
     var body: some Scene {
         WindowGroup {
             ContentView()
-                .environment(viewModel)
                 .environment(extensionSettings)
         }
         .defaultSize(width: 1200, height: 800)
@@ -36,10 +46,10 @@ struct photo_cullerApp: App {
             }
             CommandMenu("Photo") {
                 Button("Delete Bad Photos…") {
-                    viewModel.showCompletionDialog = true
+                    viewModel?.showCompletionDialog = true
                 }
                 .keyboardShortcut("d", modifiers: .command)
-                .disabled(!viewModel.hasLoadedFolder || viewModel.badCount == 0)
+                .disabled(!(viewModel?.hasLoadedFolder ?? false) || (viewModel?.badCount ?? 0) == 0)
             }
         }
 
@@ -57,7 +67,7 @@ struct photo_cullerApp: App {
         panel.message = "Select a folder containing photos"
 
         if panel.runModal() == .OK, let url = panel.url {
-            viewModel.loadFolder(
+            viewModel?.loadFolder(
                 url: url,
                 rawExtensions: extensionSettings.rawExtensions,
                 outputExtensions: extensionSettings.outputExtensions
