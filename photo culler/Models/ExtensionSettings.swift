@@ -3,7 +3,7 @@ import Observation
 
 @Observable
 class ExtensionSettings {
-    static let defaultRawExtensions: Set<String> = ["ARW", "DNG", "RAW"]
+    static let defaultRawExtensions: Set<String> = ["3FR", "ARW", "CR2", "CR3", "DNG", "FFF", "NEF", "RAF", "RAW", "RWL"]
     static let defaultOutputExtensions: Set<String> = ["JPG", "JPEG", "HIF"]
 
     private static let rawKey = "rawExtensions"

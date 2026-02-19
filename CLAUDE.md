@@ -47,7 +47,7 @@ MVVM 架构，所有源码在 `photo culler/` 目录下：
 - 键盘快捷键：左右箭头导航，上箭头=合格，下箭头=糟糕
 - 菜单栏：**Photo → Delete Bad Photos…** 可在任意时刻触发删除确认（未加载文件夹或无 Bad 照片时禁用）
 - 所有删除操作必须有审计日志记录
-- RAW 扩展名: `.arw`, `.dng`, `.raw`；输出扩展名: `.jpg`, `.jpeg`, `.hif`
+- RAW 扩展名（默认）: `.3fr`, `.arw`, `.cr2`, `.cr3`, `.dng`, `.fff`, `.nef`, `.raf`, `.raw`, `.rwl`；输出扩展名: `.jpg`, `.jpeg`, `.hif`
 
 ## Test Data
 
