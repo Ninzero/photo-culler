@@ -10,11 +10,13 @@ import SwiftUI
 @main
 struct photo_cullerApp: App {
     @State private var viewModel = PhotoCullerViewModel()
+    @State private var extensionSettings = ExtensionSettings()
 
     var body: some Scene {
         WindowGroup {
             ContentView()
                 .environment(viewModel)
+                .environment(extensionSettings)
         }
         .defaultSize(width: 1200, height: 800)
         .commands {
@@ -25,6 +27,11 @@ struct photo_cullerApp: App {
                 .keyboardShortcut("d", modifiers: .command)
                 .disabled(!viewModel.hasLoadedFolder || viewModel.badCount == 0)
             }
+        }
+
+        Settings {
+            SettingsView()
+                .environment(extensionSettings)
         }
     }
 }

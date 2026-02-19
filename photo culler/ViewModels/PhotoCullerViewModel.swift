@@ -47,10 +47,14 @@ class PhotoCullerViewModel {
         photos.filter { $0.rating == .bad }.count
     }
 
-    func loadFolder(url: URL) {
+    func loadFolder(
+        url: URL,
+        rawExtensions: Set<String> = ExtensionSettings.defaultRawExtensions,
+        outputExtensions: Set<String> = ExtensionSettings.defaultOutputExtensions
+    ) {
         folderURL = url
         do {
-            photos = try PhotoScanner.scan(folderURL: url)
+            photos = try PhotoScanner.scan(folderURL: url, rawExtensions: rawExtensions, outputExtensions: outputExtensions)
 
             // Load persisted ratings
             let savedRatings = RatingStore.load(from: url)

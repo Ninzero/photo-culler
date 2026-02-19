@@ -1,10 +1,11 @@
 import Foundation
 
 struct PhotoScanner {
-    private static let rawExtensions: Set<String> = ["arw", "dng", "raw"]
-    private static let outputExtensions: Set<String> = ["jpg", "jpeg", "hif"]
-
-    static func scan(folderURL: URL) throws -> [PhotoItem] {
+    static func scan(
+        folderURL: URL,
+        rawExtensions: Set<String> = ExtensionSettings.defaultRawExtensions,
+        outputExtensions: Set<String> = ExtensionSettings.defaultOutputExtensions
+    ) throws -> [PhotoItem] {
         let fileManager = FileManager.default
         let contents = try fileManager.contentsOfDirectory(
             at: folderURL,
@@ -15,7 +16,7 @@ struct PhotoScanner {
         var grouped: [String: PhotoItem] = [:]
 
         for fileURL in contents {
-            let ext = fileURL.pathExtension.lowercased()
+            let ext = fileURL.pathExtension.uppercased()
             let basename = fileURL.deletingPathExtension().lastPathComponent
 
             if rawExtensions.contains(ext) {

@@ -9,6 +9,7 @@ import SwiftUI
 
 struct ContentView: View {
     @Environment(PhotoCullerViewModel.self) private var viewModel
+    @Environment(ExtensionSettings.self) private var extensionSettings
 
     var body: some View {
         Group {
@@ -16,7 +17,11 @@ struct ContentView: View {
                 PhotoReviewView(viewModel: viewModel)
             } else {
                 FolderSelectionView { url in
-                    viewModel.loadFolder(url: url)
+                    viewModel.loadFolder(
+                        url: url,
+                        rawExtensions: extensionSettings.rawExtensions,
+                        outputExtensions: extensionSettings.outputExtensions
+                    )
                 }
             }
         }
@@ -26,4 +31,5 @@ struct ContentView: View {
 #Preview {
     ContentView()
         .environment(PhotoCullerViewModel())
+        .environment(ExtensionSettings())
 }
