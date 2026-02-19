@@ -89,6 +89,11 @@ class PhotoCullerViewModel {
         }
     }
 
+    func goTo(index: Int) {
+        guard index >= 0, index < photos.count else { return }
+        currentIndex = index
+    }
+
     func rateCurrent(_ rating: Rating) {
         guard !photos.isEmpty, currentIndex >= 0, currentIndex < photos.count else { return }
         guard let folderURL else { return }
