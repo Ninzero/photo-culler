@@ -23,11 +23,11 @@ xcodebuild -project "photo culler.xcodeproj" -scheme "photo culler" build
 
 MVVM 架构，所有源码在 `photo culler/` 目录下：
 
-- **`photo_cullerApp.swift`** — App 入口，在 App 级别创建 `PhotoCullerViewModel`（`@State`），通过 `.environment(viewModel)` 注入给子视图；同时在 `WindowGroup` 上挂载 `.commands { CommandMenu("Photo") { ... } }` 自定义菜单
-- **Models/** — `PhotoItem`（照片数据模型，按 basename 聚合 RAW + 输出文件）、`Rating`（`.good` / `.bad` 枚举，Codable）
-- **ViewModels/** — `PhotoCullerViewModel`（`@Observable`，管理照片列表、当前索引、评价、删除流程等全部业务状态）
-- **Views/** — `ContentView`（根视图，通过 `@Environment(PhotoCullerViewModel.self)` 接收 viewModel，切换文件夹选择/照片审阅）、`PhotoReviewView`、`PhotoDisplayView`、`BottomControlBar`、`ProgressBarView`、`FolderSelectionView`
-- **Services/** — `PhotoScanner`（扫描文件夹，按 basename 分组 RAW/输出文件）、`RatingStore`（JSON 持久化至 `.photo_culler_ratings.json`）、`AuditLogger`（审计日志至 `.photo_culler_audit.log`）、`PhotoDeleter`（安全删除 + 审计）
+- **`photo_cullerApp.swift`** — App 入口；`AppDelegate` 实现最后窗口关闭时退出 App；App 级别创建 `ExtensionSettings`（`@State`）并通过 `.environment()` 注入；使用 `ViewModelFocusedKey`（`@FocusedValue`）让菜单命令访问当前窗口的 ViewModel；菜单含 **File > Open…**（Cmd+O）和 **Photo > Delete Bad Photos…**（Cmd+D）
+- **Models/** — `PhotoItem`（照片数据模型，按 basename 聚合 RAW + 输出文件）、`Rating`（`.good` / `.bad` 枚举，Codable）、`ExtensionSettings`（`@Observable` class，管理可配置的 RAW/输出扩展名，持久化至 `UserDefaults`）
+- **ViewModels/** — `PhotoCullerViewModel`（`@Observable`，管理照片列表、当前索引、评价、删除流程等全部业务状态；含 `showDeletionResult` / `deletionResultMessage` 属性驱动删除完成提示）
+- **Views/** — `ContentView`（根视图，内部用 `@State` 创建 `PhotoCullerViewModel`，通过 `.environment()` + `.focusedSceneValue()` 双重注入；切换文件夹选择/照片审阅）、`PhotoReviewView`（含两个 alert：全部评价完成 + 删除完成）、`PhotoDisplayView`（图片显示，支持捏合/滚轮缩放 1x–20x、双击缩放到 2.5x/复位、拖动平移；使用 `NSViewRepresentable` + ImageIO 提取 RAW 缩略图）、`BottomControlBar`、`ProgressBarView`、`FolderSelectionView`、`ThumbnailStripView`（右侧悬停展开的缩略图条，显示全部照片及评价徽章，点击跳转）、`SettingsView`（RAW/输出扩展名设置窗口）、`ExtensionListEditor`（扩展名列表编辑组件）
+- **Services/** — `PhotoScanner`（扫描文件夹，按 basename 分组 RAW/输出文件）、`RatingStore`（JSON 持久化至 `.photo_culler_ratings.json`）、`AuditLogger`（审计日志至 `.photo_culler_audit.log`）、`PhotoDeleter`（安全删除 + 审计，返回 `DeletionResult`）
 
 ## Key Data Flow
 
@@ -45,6 +45,8 @@ MVVM 架构，所有源码在 `photo culler/` 目录下：
 - 持久化文件存放在用户选择的文件夹内（隐藏文件 `.photo_culler_ratings.json` 和 `.photo_culler_audit.log`）
 - 显示照片时优先使用输出格式（HIF/JPG），其次 RAW
 - 键盘快捷键：左右箭头导航，上箭头=合格，下箭头=糟糕
+- 菜单快捷键：Cmd+O 打开文件夹，Cmd+D 触发删除确认
 - 菜单栏：**Photo → Delete Bad Photos…** 可在任意时刻触发删除确认（未加载文件夹或无 Bad 照片时禁用）
 - 所有删除操作必须有审计日志记录
 - RAW 扩展名（默认）: `.3fr`, `.arw`, `.cr2`, `.cr3`, `.dng`, `.fff`, `.nef`, `.raf`, `.raw`, `.rwl`；输出扩展名: `.jpg`, `.jpeg`, `.hif`
+- RAW/输出扩展名用户可在 **Settings** 窗口自定义，持久化至 `UserDefaults`（`rawExtensions` / `outputExtensions` key）
