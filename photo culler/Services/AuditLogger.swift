@@ -2,12 +2,19 @@ import Foundation
 
 struct AuditLogger {
     static func log(_ message: String, in folderURL: URL) {
+        log(message, folderName: folderURL.lastPathComponent)
+    }
+
+    static func log(_ message: String) {
+        log(message, folderName: "global")
+    }
+
+    private static func log(_ message: String, folderName: String) {
         guard let url = logURL() else { return }
         let dir = url.deletingLastPathComponent()
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
 
         let timestamp = ISO8601DateFormatter().string(from: Date())
-        let folderName = folderURL.lastPathComponent
         let line = "[\(timestamp)] [\(folderName)] \(message)\n"
 
         if FileManager.default.fileExists(atPath: url.path) {

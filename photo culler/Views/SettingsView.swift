@@ -37,7 +37,13 @@ struct SettingsView: View {
         .formStyle(.grouped)
         .frame(width: 400, height: 560)
         .alert("Clear All Ratings?", isPresented: $showClearRatingsAlert) {
-            Button("Clear", role: .destructive) { RatingStore.save([:]) }
+            Button("Clear", role: .destructive) {
+                let existing = RatingStore.load()
+                let good = existing.values.filter { $0 == .good }.count
+                let bad  = existing.values.filter { $0 == .bad  }.count
+                RatingStore.save([:])
+                AuditLogger.log("Cleared all ratings: \(existing.count) total (\(good) good, \(bad) bad)")
+            }
             Button("Cancel", role: .cancel) {}
         } message: {
             Text("This will permanently delete all stored ratings across all folders. This action cannot be undone.")
