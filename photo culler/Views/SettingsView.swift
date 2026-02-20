@@ -2,6 +2,7 @@ import SwiftUI
 
 struct SettingsView: View {
     @Environment(ExtensionSettings.self) private var settings
+    @State private var showClearRatingsAlert = false
 
     var body: some View {
         @Bindable var settings = settings
@@ -21,6 +22,12 @@ struct SettingsView: View {
                 }
             }
 
+            Section("Data") {
+                Button("Clear All Ratings…", role: .destructive) {
+                    showClearRatingsAlert = true
+                }
+            }
+
             Section {
                 Text("Changes will take effect the next time you open a folder.")
                     .foregroundStyle(.secondary)
@@ -28,7 +35,13 @@ struct SettingsView: View {
             }
         }
         .formStyle(.grouped)
-        .frame(width: 400, height: 500)
+        .frame(width: 400, height: 560)
+        .alert("Clear All Ratings?", isPresented: $showClearRatingsAlert) {
+            Button("Clear", role: .destructive) { RatingStore.save([:]) }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("This will permanently delete all stored ratings across all folders. This action cannot be undone.")
+        }
     }
 }
 

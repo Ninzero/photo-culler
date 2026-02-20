@@ -10,6 +10,7 @@ class PhotoCullerViewModel {
     var showDeletionResult: Bool = false
     var deletionResultMessage: String = ""
 
+    private var globalRatings: [String: Rating] = [:]
     private var isAdvancing = false
 
     var hasLoadedFolder: Bool {
@@ -58,11 +59,18 @@ class PhotoCullerViewModel {
         do {
             photos = try PhotoScanner.scan(folderURL: url, rawExtensions: rawExtensions, outputExtensions: outputExtensions)
 
-            // Load persisted ratings
-            let savedRatings = RatingStore.load(from: url)
-            for (index, photo) in photos.enumerated() {
-                if let rating = savedRatings[photo.id] {
-                    photos[index].rating = rating
+            // Compute file hashes for all photos
+            for i in photos.indices {
+                let primaryURL = photos[i].rawURL ?? photos[i].outputURL
+                photos[i].fileHash = primaryURL.flatMap { FileHasher.hash(for: $0) }
+            }
+            FileHasher.persistCache()
+
+            // Load global ratings and apply by hash
+            globalRatings = RatingStore.load()
+            for i in photos.indices {
+                if let hash = photos[i].fileHash {
+                    photos[i].rating = globalRatings[hash]
                 }
             }
 
@@ -73,7 +81,7 @@ class PhotoCullerViewModel {
                 currentIndex = 0
             }
 
-            AuditLogger.log("SESSION_START: Loaded folder \(url.lastPathComponent) with \(photos.count) photos, \(savedRatings.count) existing ratings", in: url)
+            AuditLogger.log("SESSION_START: Loaded \(photos.count) photos, \(globalRatings.count) total global ratings", in: url)
         } catch {
             photos = []
         }
@@ -105,12 +113,15 @@ class PhotoCullerViewModel {
         let newRating: Rating? = photos[currentIndex].rating == rating ? nil : rating
         photos[currentIndex].rating = newRating
 
-        // Persist ratings
-        var allRatings: [String: Rating] = [:]
-        for p in photos where p.rating != nil {
-            allRatings[p.id] = p.rating
+        // Persist rating keyed by file hash
+        if let hash = photo.fileHash {
+            if let newRating {
+                globalRatings[hash] = newRating
+            } else {
+                globalRatings.removeValue(forKey: hash)
+            }
+            RatingStore.save(globalRatings)
         }
-        RatingStore.save(allRatings, to: folderURL)
 
         AuditLogger.log("RATED: \(photo.id) -> \(newRating?.rawValue ?? "unrated")", in: folderURL)
 
@@ -139,15 +150,17 @@ class PhotoCullerViewModel {
         let result = PhotoDeleter.deleteBadPhotos(from: photos, in: folderURL)
         deletionResultMessage = result.summary
 
+        // Remove deleted photos' hashes from global ratings
+        for p in photos where p.rating == .bad {
+            if let hash = p.fileHash {
+                globalRatings.removeValue(forKey: hash)
+            }
+        }
+
         // Remove bad photos from in-memory state
         photos.removeAll { $0.rating == .bad }
 
-        // Update persisted ratings (only good photos remain)
-        var remainingRatings: [String: Rating] = [:]
-        for p in photos where p.rating != nil {
-            remainingRatings[p.id] = p.rating
-        }
-        RatingStore.save(remainingRatings, to: folderURL)
+        RatingStore.save(globalRatings)
 
         // Adjust currentIndex to stay in bounds
         if photos.isEmpty {

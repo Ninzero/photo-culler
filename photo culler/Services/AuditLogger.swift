@@ -1,12 +1,14 @@
 import Foundation
 
 struct AuditLogger {
-    private static let fileName = ".photo_culler_audit.log"
-
     static func log(_ message: String, in folderURL: URL) {
-        let url = folderURL.appendingPathComponent(fileName)
+        guard let url = logURL() else { return }
+        let dir = url.deletingLastPathComponent()
+        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+
         let timestamp = ISO8601DateFormatter().string(from: Date())
-        let line = "[\(timestamp)] \(message)\n"
+        let folderName = folderURL.lastPathComponent
+        let line = "[\(timestamp)] [\(folderName)] \(message)\n"
 
         if FileManager.default.fileExists(atPath: url.path) {
             guard let handle = try? FileHandle(forWritingTo: url) else { return }
@@ -18,5 +20,12 @@ struct AuditLogger {
         } else {
             try? line.write(to: url, atomically: true, encoding: .utf8)
         }
+    }
+
+    private static func logURL() -> URL? {
+        guard let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first else { return nil }
+        return appSupport
+            .appendingPathComponent("com.ninzero.photo-culler")
+            .appendingPathComponent("audit.log")
     }
 }
