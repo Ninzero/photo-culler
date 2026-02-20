@@ -10,6 +10,8 @@ class PhotoCullerViewModel {
     var showDeletionResult: Bool = false
     var deletionResultMessage: String = ""
 
+    private var isAdvancing = false
+
     var hasLoadedFolder: Bool {
         folderURL != nil
     }
@@ -97,6 +99,7 @@ class PhotoCullerViewModel {
     func rateCurrent(_ rating: Rating) {
         guard !photos.isEmpty, currentIndex >= 0, currentIndex < photos.count else { return }
         guard let folderURL else { return }
+        guard !isAdvancing else { return }
 
         let photo = photos[currentIndex]
         let newRating: Rating? = photos[currentIndex].rating == rating ? nil : rating
@@ -116,8 +119,10 @@ class PhotoCullerViewModel {
         let shouldShowCompletion = allRated
         let shouldAdvance = !allRated && canGoNext
 
+        isAdvancing = true
         Task { @MainActor in
             try? await Task.sleep(for: .milliseconds(100))
+            isAdvancing = false
             if shouldShowCompletion {
                 showCompletionDialog = true
             } else if shouldAdvance {
