@@ -118,7 +118,7 @@ struct PhotoDisplayView: View {
     }
 
     // 使用 ImageIO 加载图片，对 RAW 文件直接读取内嵌 JPEG 预览，避免主线程阻塞
-    private static func loadImage(from url: URL) -> NSImage? {
+    private nonisolated static func loadImage(from url: URL) -> NSImage? {
         guard let source = CGImageSourceCreateWithURL(url as CFURL, nil) else { return nil }
         let options: [CFString: Any] = [
             kCGImageSourceCreateThumbnailFromImageIfAbsent: true,
