@@ -12,7 +12,7 @@ Xcode 项目，无外部依赖，仅使用 Foundation / SwiftUI / AppKit / Obser
 
 ```bash
 # 命令行构建
-xcodebuild -project "photo culler.xcodeproj" -scheme "photo culler" build
+xcodebuild -project "photo culler.xcodeproj" -scheme "photo culler" -destination 'platform=macOS,arch=arm64' build
 
 # 或在 Xcode 中: Cmd+B 构建, Cmd+R 运行, Cmd+U 测试
 ```
@@ -37,8 +37,8 @@ MVVM 架构，所有源码在 `photo culler/` 目录下：
 4. `FileHasher`（actor）对每个请求：缓存命中直接返回，缓存未命中通过 `Task.detached` 在 cooperative thread pool 上并发读取文件前 4 MB 并计算 SHA-256
 5. 全部哈希计算完成后，`RatingStore` 从 App Support 全局 JSON 恢复已有评价（以 SHA-256 为 key）
 6. ViewModel 跳转到第一张未评价照片
-5. 评价后自动保存 JSON + 写审计日志 + 自动跳转下一张未评价照片
-6. 确认删除弹窗可通过两种方式触发：
+7. 评价后自动保存 JSON + 写审计日志 + 自动跳转下一张未评价照片
+8. 确认删除弹窗可通过两种方式触发：
    - 自动：全部照片评价完成后自动弹出
    - 手动：菜单栏 **Photo → Delete Bad Photos…**（有 Bad 照片时可用）
 
