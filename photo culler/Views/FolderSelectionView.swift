@@ -18,7 +18,7 @@ struct FolderSelectionView: View {
     }
 
     private func chooseFolder() {
-        let panel = NSOpenPanel()
+        let panel = AppDelegate.openPanel()
         panel.canChooseFiles = false
         panel.canChooseDirectories = true
         panel.allowsMultipleSelection = false

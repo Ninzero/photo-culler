@@ -20,8 +20,26 @@ extension FocusedValues {
 }
 
 class AppDelegate: NSObject, NSApplicationDelegate {
+    private static var cachedPanel: NSOpenPanel?
+
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
         return true
+    }
+
+    func applicationDidFinishLaunching(_ notification: Notification) {
+        // Pre-warm NSOpenPanel on next run loop iteration to avoid blocking window display
+        DispatchQueue.main.async {
+            Self.cachedPanel = NSOpenPanel()
+        }
+    }
+
+    static func openPanel() -> NSOpenPanel {
+        if let panel = cachedPanel {
+            return panel
+        }
+        let panel = NSOpenPanel()
+        cachedPanel = panel
+        return panel
     }
 }
 
@@ -60,7 +78,7 @@ struct photo_cullerApp: App {
     }
 
     private func openFolder() {
-        let panel = NSOpenPanel()
+        let panel = AppDelegate.openPanel()
         panel.canChooseFiles = false
         panel.canChooseDirectories = true
         panel.allowsMultipleSelection = false
