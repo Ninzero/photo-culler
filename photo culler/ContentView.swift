@@ -13,15 +13,25 @@ struct ContentView: View {
 
     var body: some View {
         Group {
-            if viewModel.hasLoadedFolder {
+            if viewModel.isLoadingFolder {
+                VStack(spacing: 12) {
+                    ProgressView()
+                        .controlSize(.large)
+                    Text("Loading photos…")
+                        .foregroundStyle(.secondary)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else if viewModel.hasLoadedFolder {
                 PhotoReviewView(viewModel: viewModel)
             } else {
                 FolderSelectionView { url in
-                    viewModel.loadFolder(
-                        url: url,
-                        rawExtensions: extensionSettings.rawExtensions,
-                        outputExtensions: extensionSettings.outputExtensions
-                    )
+                    Task {
+                        await viewModel.loadFolder(
+                            url: url,
+                            rawExtensions: extensionSettings.rawExtensions,
+                            outputExtensions: extensionSettings.outputExtensions
+                        )
+                    }
                 }
             }
         }

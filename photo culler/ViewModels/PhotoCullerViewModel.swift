@@ -10,6 +10,8 @@ class PhotoCullerViewModel {
     var showDeletionResult: Bool = false
     var deletionResultMessage: String = ""
 
+    var isLoadingFolder = false
+
     private var globalRatings: [String: Rating] = [:]
     private var isAdvancing = false
 
@@ -54,25 +56,41 @@ class PhotoCullerViewModel {
         url: URL,
         rawExtensions: Set<String> = ExtensionSettings.defaultRawExtensions,
         outputExtensions: Set<String> = ExtensionSettings.defaultOutputExtensions
-    ) {
+    ) async {
+        isLoadingFolder = true
         folderURL = url
         do {
-            photos = try PhotoScanner.scan(folderURL: url, rawExtensions: rawExtensions, outputExtensions: outputExtensions)
+            let scannedPhotos = try PhotoScanner.scan(folderURL: url, rawExtensions: rawExtensions, outputExtensions: outputExtensions)
 
-            // Compute file hashes for all photos
-            for i in photos.indices {
-                let primaryURL = photos[i].rawURL ?? photos[i].outputURL
-                photos[i].fileHash = primaryURL.flatMap { FileHasher.hash(for: $0) }
+            // Compute file hashes concurrently using withTaskGroup
+            var hashResults = [(Int, String?)](repeating: (0, nil), count: scannedPhotos.count)
+            await withTaskGroup(of: (Int, String?).self) { group in
+                for i in scannedPhotos.indices {
+                    let primaryURL = scannedPhotos[i].rawURL ?? scannedPhotos[i].outputURL
+                    group.addTask {
+                        guard let url = primaryURL else { return (i, nil) }
+                        let hash = await FileHasher.shared.hash(for: url)
+                        return (i, hash)
+                    }
+                }
+                for await (i, hash) in group {
+                    hashResults[i] = (i, hash)
+                }
             }
-            FileHasher.persistCache()
+
+            await FileHasher.shared.persistCache()
+
+            var finalPhotos = scannedPhotos
+            for (i, hash) in hashResults { finalPhotos[i].fileHash = hash }
 
             // Load global ratings and apply by hash
             globalRatings = RatingStore.load()
-            for i in photos.indices {
-                if let hash = photos[i].fileHash {
-                    photos[i].rating = globalRatings[hash]
+            for i in finalPhotos.indices {
+                if let hash = finalPhotos[i].fileHash {
+                    finalPhotos[i].rating = globalRatings[hash]
                 }
             }
+            photos = finalPhotos
 
             // Jump to the first unrated photo
             if let firstUnrated = photos.firstIndex(where: { $0.rating == nil }) {
@@ -85,6 +103,7 @@ class PhotoCullerViewModel {
         } catch {
             photos = []
         }
+        isLoadingFolder = false
     }
 
     func goToNext() {

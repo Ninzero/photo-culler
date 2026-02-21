@@ -67,11 +67,13 @@ struct photo_cullerApp: App {
         panel.message = "Select a folder containing photos"
 
         if panel.runModal() == .OK, let url = panel.url {
-            viewModel?.loadFolder(
-                url: url,
-                rawExtensions: extensionSettings.rawExtensions,
-                outputExtensions: extensionSettings.outputExtensions
-            )
+            Task { @MainActor in
+                await viewModel?.loadFolder(
+                    url: url,
+                    rawExtensions: extensionSettings.rawExtensions,
+                    outputExtensions: extensionSettings.outputExtensions
+                )
+            }
         }
     }
 }
