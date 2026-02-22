@@ -5,7 +5,7 @@ struct PhotoItem: Identifiable {
     var rawURL: URL?
     var outputURL: URL?
     var rating: Rating?
-    var fileHash: String? // SHA-256 hex of the primary file (first 4 MB), filled at runtime
+    var fileHashes: [String] = [] // SHA-256 hex of each associated file (RAW + output), filled at runtime
 
     var displayURL: URL? {
         outputURL ?? rawURL

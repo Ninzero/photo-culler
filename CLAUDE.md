@@ -24,7 +24,7 @@ xcodebuild -project "photo culler.xcodeproj" -scheme "photo culler" -destination
 MVVM 架构，所有源码在 `photo culler/` 目录下：
 
 - **`photo_cullerApp.swift`** — App 入口；`AppDelegate` 实现最后窗口关闭时退出 App；App 级别创建 `ExtensionSettings`（`@State`）并通过 `.environment()` 注入；使用 `ViewModelFocusedKey`（`@FocusedValue`）让菜单命令访问当前窗口的 ViewModel；菜单含 **File > Open…**（Cmd+O）和 **Photo > Delete Bad Photos…**（Cmd+D）
-- **Models/** — `PhotoItem`（照片数据模型，按 basename 聚合 RAW + 输出文件；含运行时填充的 `fileHash: String?` 字段，为主文件前 4 MB 的 SHA-256 hex）、`Rating`（`.good` / `.bad` 枚举，Codable）、`ExtensionSettings`（`@Observable` class，管理可配置的 RAW/输出扩展名，持久化至 `UserDefaults`）
+- **Models/** — `PhotoItem`（照片数据模型，按 basename 聚合 RAW + 输出文件；含运行时填充的 `fileHashes: [String]` 字段，为各关联文件前 4 MB 的 SHA-256 hex 列表，RAW 和输出文件各自独立计算）、`Rating`（`.good` / `.bad` 枚举，Codable）、`ExtensionSettings`（`@Observable` class，管理可配置的 RAW/输出扩展名，持久化至 `UserDefaults`）
 - **ViewModels/** — `PhotoCullerViewModel`（`@Observable`，管理照片列表、当前索引、评价、删除流程等全部业务状态；含 `showDeletionResult` / `deletionResultMessage` 属性驱动删除完成提示；含 `isLoadingFolder` 属性驱动加载 spinner；`loadFolder()` 为 `async`，用 `withTaskGroup` 并发计算哈希）
 - **Views/** — `ContentView`（根视图，内部用 `@State` 创建 `PhotoCullerViewModel`，通过 `.environment()` + `.focusedSceneValue()` 双重注入；三态切换：加载中显示 spinner / 已加载显示审阅视图 / 未加载显示文件夹选择）、`PhotoReviewView`（含两个 alert：全部评价完成 + 删除完成）、`PhotoDisplayView`（图片显示，支持捏合/滚轮缩放 1x–20x、双击缩放到 2.5x/复位、拖动平移；使用 `NSViewRepresentable` + ImageIO 提取 RAW 缩略图）、`BottomControlBar`、`ProgressBarView`、`FolderSelectionView`、`ThumbnailStripView`（右侧悬停展开的缩略图条，显示全部照片及评价徽章，点击跳转）、`SettingsView`（RAW/输出扩展名设置窗口）、`ExtensionListEditor`（扩展名列表编辑组件）
 - **Services/** — `PhotoScanner`（扫描文件夹，按 basename 分组 RAW/输出文件）、`FileHasher`（`actor`，单例 `shared`；`hash(for:)` 为 `async`，缓存命中在 actor 上快速返回，缓存未命中通过 `Task.detached` 并发执行文件 I/O；`computeHash` 为 `nonisolated static` 可在任意线程调用；`persistCache()` 快照后在 background detached task 中异步写盘；磁盘缓存路径 `~/Library/Caches/com.ninzero.photo-culler/hash_cache.json`）、`RatingStore`（全局 JSON 持久化至 `~/Library/Application Support/com.ninzero.photo-culler/ratings.json`，key 为文件内容 SHA-256 hex）、`AuditLogger`（全局审计日志至 `~/Library/Application Support/com.ninzero.photo-culler/audit.log`，每条含文件夹名）、`PhotoDeleter`（安全删除 + 审计，返回 `DeletionResult`）
@@ -48,7 +48,7 @@ MVVM 架构，所有源码在 `photo culler/` 目录下：
   - 用户评价（不可丢失）：`~/Library/Application Support/com.ninzero.photo-culler/ratings.json`（key = 文件内容 SHA-256 hex）
   - 审计日志：`~/Library/Application Support/com.ninzero.photo-culler/audit.log`（每条含文件夹名前缀）
   - 哈希缓存（可重建）：`~/Library/Caches/com.ninzero.photo-culler/hash_cache.json`
-- `PhotoItem.fileHash` 在 `loadFolder()` 时由 `FileHasher` 并发填充（前 4 MB SHA-256），评价以此为全局唯一键，文件夹移动/重命名后评价依然有效
+- `PhotoItem.fileHashes` 在 `loadFolder()` 时由 `FileHasher` 并发填充（RAW + 输出文件各自前 4 MB SHA-256），评价以任意一个 hash 为全局唯一键（写入时同时写入所有 hash），文件夹移动/重命名、或删除 RAW 只保留输出文件后评价依然有效
 - 显示照片时优先使用输出格式（HIF/JPG），其次 RAW
 - 键盘快捷键：左右箭头导航，上箭头=合格，下箭头=糟糕
 - 菜单快捷键：Cmd+O 打开文件夹，Cmd+D 触发删除确认

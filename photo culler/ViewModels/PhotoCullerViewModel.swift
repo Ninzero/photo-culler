@@ -62,32 +62,37 @@ class PhotoCullerViewModel {
         do {
             let scannedPhotos = try PhotoScanner.scan(folderURL: url, rawExtensions: rawExtensions, outputExtensions: outputExtensions)
 
-            // Compute file hashes concurrently using withTaskGroup
-            var hashResults = [(Int, String?)](repeating: (0, nil), count: scannedPhotos.count)
-            await withTaskGroup(of: (Int, String?).self) { group in
+            // Compute file hashes concurrently using withTaskGroup (both RAW and output)
+            var hashResults = [(Int, [String])](repeating: (0, []), count: scannedPhotos.count)
+            await withTaskGroup(of: (Int, [String]).self) { group in
                 for i in scannedPhotos.indices {
-                    let primaryURL = scannedPhotos[i].rawURL ?? scannedPhotos[i].outputURL
+                    let rawURL = scannedPhotos[i].rawURL
+                    let outputURL = scannedPhotos[i].outputURL
                     group.addTask {
-                        guard let url = primaryURL else { return (i, nil) }
-                        let hash = await FileHasher.shared.hash(for: url)
-                        return (i, hash)
+                        var hashes: [String] = []
+                        if let url = rawURL, let h = await FileHasher.shared.hash(for: url) { hashes.append(h) }
+                        if let url = outputURL, let h = await FileHasher.shared.hash(for: url) { hashes.append(h) }
+                        return (i, hashes)
                     }
                 }
-                for await (i, hash) in group {
-                    hashResults[i] = (i, hash)
+                for await (i, hashes) in group {
+                    hashResults[i] = (i, hashes)
                 }
             }
 
             await FileHasher.shared.persistCache()
 
             var finalPhotos = scannedPhotos
-            for (i, hash) in hashResults { finalPhotos[i].fileHash = hash }
+            for (i, hashes) in hashResults { finalPhotos[i].fileHashes = hashes }
 
-            // Load global ratings and apply by hash
+            // Load global ratings and apply by hash (match any file hash)
             globalRatings = RatingStore.load()
             for i in finalPhotos.indices {
-                if let hash = finalPhotos[i].fileHash {
-                    finalPhotos[i].rating = globalRatings[hash]
+                for hash in finalPhotos[i].fileHashes {
+                    if let rating = globalRatings[hash] {
+                        finalPhotos[i].rating = rating
+                        break
+                    }
                 }
             }
             photos = finalPhotos
@@ -132,13 +137,15 @@ class PhotoCullerViewModel {
         let newRating: Rating? = photos[currentIndex].rating == rating ? nil : rating
         photos[currentIndex].rating = newRating
 
-        // Persist rating keyed by file hash
-        if let hash = photo.fileHash {
+        // Persist rating keyed by all file hashes
+        for hash in photo.fileHashes {
             if let newRating {
                 globalRatings[hash] = newRating
             } else {
                 globalRatings.removeValue(forKey: hash)
             }
+        }
+        if !photo.fileHashes.isEmpty {
             RatingStore.save(globalRatings)
         }
 
@@ -171,7 +178,7 @@ class PhotoCullerViewModel {
 
         // Remove deleted photos' hashes from global ratings
         for p in photos where p.rating == .bad {
-            if let hash = p.fileHash {
+            for hash in p.fileHashes {
                 globalRatings.removeValue(forKey: hash)
             }
         }
