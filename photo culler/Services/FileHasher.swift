@@ -42,6 +42,15 @@ actor FileHasher {
         return hashString
     }
 
+    /// Clears the in-memory cache and deletes the on-disk cache file.
+    func clearCache() {
+        cache = [:]
+        Task.detached(priority: .background) {
+            guard let url = FileHasher.cacheURL() else { return }
+            try? FileManager.default.removeItem(at: url)
+        }
+    }
+
     /// Persists the in-memory cache to disk asynchronously.
     func persistCache() {
         let snapshot = cache
