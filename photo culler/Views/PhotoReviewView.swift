@@ -117,7 +117,7 @@ struct PhotoReviewView: View {
                 }
             }
         }
-        .alert("All Photos Rated", isPresented: $viewModel.showCompletionDialog) {
+        .alert(viewModel.allRated ? "All Photos Rated" : "Confirm Deletion", isPresented: $viewModel.showCompletionDialog) {
             if viewModel.viewMode == .allPhotos || viewModel.viewMode == .unratedOnly {
                 Button("Review Rejected Only") {
                     viewModel.enterReviewRejectsMode()
@@ -130,7 +130,12 @@ struct PhotoReviewView: View {
                 viewModel.cancelDeletion()
             }
         } message: {
-            Text("\(viewModel.goodCount) good, \(viewModel.badCount) bad.\nDelete all bad photos and their associated files?")
+            let unratedCount = viewModel.unratedPhotos.count
+            if unratedCount > 0 {
+                Text("\(viewModel.goodCount) good, \(viewModel.badCount) bad, \(unratedCount) unrated.\nDelete all bad photos and their associated files?")
+            } else {
+                Text("\(viewModel.goodCount) good, \(viewModel.badCount) bad.\nDelete all bad photos and their associated files?")
+            }
         }
         .alert("Deletion Complete", isPresented: $viewModel.showDeletionResult) {
             Button("OK", role: .cancel) {}
