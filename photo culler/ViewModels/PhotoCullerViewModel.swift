@@ -304,14 +304,21 @@ class PhotoCullerViewModel {
         let result = PhotoDeleter.deleteBadPhotos(from: photos, in: folderURL)
         deletionResultMessage = result.summary
 
+        // Snapshot IDs before modifying RatingStore: applyRating triggers syncRatingsFromStore
+        // which may clear ratings synchronously, causing removeAll { $0.rating == .bad } to miss them.
+        let badPhotoIds = Set(photos.filter { $0.rating == .bad }.map { $0.id })
+
         // Remove deleted photos' keys from shared store
         for p in photos where p.rating == .bad {
             let keys: [String] = matchingMode == .path ? [p.pathKey] : p.fileHashes
             RatingStore.shared.applyRating(nil, forKeys: keys)
         }
 
-        // Remove bad photos from in-memory state
-        photos.removeAll { $0.rating == .bad }
+        // Remove bad photos by ID (immune to rating changes caused by syncRatingsFromStore)
+        photos.removeAll { badPhotoIds.contains($0.id) }
+
+        // Exit Rejected Only mode so the user returns to All Photos view
+        isReviewRejectsMode = false
 
         // Adjust currentIndex to stay in bounds
         if photos.isEmpty {
