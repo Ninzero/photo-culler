@@ -1,6 +1,12 @@
 import Foundation
 import Observation
 
+enum ViewMode {
+    case allPhotos
+    case rejectedOnly
+    case unratedOnly
+}
+
 @Observable
 class PhotoCullerViewModel {
     var photos: [PhotoItem] = []
@@ -13,8 +19,8 @@ class PhotoCullerViewModel {
     var isLoadingFolder = false
     private(set) var matchingMode: MatchingMode = .hash
 
-    var isReviewRejectsMode: Bool = false
-    private var rejectReviewIndex: Int = 0
+    var viewMode: ViewMode = .allPhotos
+    private var filteredViewIndex: Int = 0
 
     private var isAdvancing = false
     private var ratingsObserver: NSObjectProtocol?
@@ -93,28 +99,41 @@ class PhotoCullerViewModel {
         photos.filter { $0.rating == .bad }
     }
 
+    var unratedPhotos: [PhotoItem] {
+        photos.filter { $0.rating == nil }
+    }
+
     var displayedPhotos: [PhotoItem] {
-        isReviewRejectsMode ? badPhotos : photos
+        switch viewMode {
+        case .allPhotos:    return photos
+        case .rejectedOnly: return badPhotos
+        case .unratedOnly:  return unratedPhotos
+        }
     }
 
     var displayedCurrentIndex: Int {
-        isReviewRejectsMode ? rejectReviewIndex : currentIndex
+        viewMode == .allPhotos ? currentIndex : filteredViewIndex
     }
 
     var displayedCurrentPhoto: PhotoItem? {
-        if isReviewRejectsMode {
-            guard rejectReviewIndex >= 0, rejectReviewIndex < badPhotos.count else { return nil }
-            return badPhotos[rejectReviewIndex]
+        switch viewMode {
+        case .allPhotos:
+            return currentPhoto
+        case .rejectedOnly:
+            guard filteredViewIndex >= 0, filteredViewIndex < badPhotos.count else { return nil }
+            return badPhotos[filteredViewIndex]
+        case .unratedOnly:
+            guard filteredViewIndex >= 0, filteredViewIndex < unratedPhotos.count else { return nil }
+            return unratedPhotos[filteredViewIndex]
         }
-        return currentPhoto
     }
 
     var displayedCanGoNext: Bool {
-        isReviewRejectsMode ? rejectReviewIndex < badPhotos.count - 1 : canGoNext
+        viewMode == .allPhotos ? canGoNext : filteredViewIndex < displayedPhotos.count - 1
     }
 
     var displayedCanGoPrevious: Bool {
-        isReviewRejectsMode ? rejectReviewIndex > 0 : canGoPrevious
+        viewMode == .allPhotos ? canGoPrevious : filteredViewIndex > 0
     }
 
     func loadFolder(
@@ -186,41 +205,45 @@ class PhotoCullerViewModel {
         isLoadingFolder = false
     }
 
-    func enterReviewRejectsMode() {
-        isReviewRejectsMode = true
-        rejectReviewIndex = 0
-    }
-
-    func exitReviewRejectsMode() {
-        if let current = displayedCurrentPhoto,
+    func setViewMode(_ mode: ViewMode) {
+        if mode == .allPhotos, let current = displayedCurrentPhoto,
            let idx = photos.firstIndex(where: { $0.id == current.id }) {
             currentIndex = idx
         }
-        isReviewRejectsMode = false
+        viewMode = mode
+        filteredViewIndex = 0
+    }
+
+    func enterReviewRejectsMode() {
+        setViewMode(.rejectedOnly)
+    }
+
+    func exitReviewRejectsMode() {
+        setViewMode(.allPhotos)
     }
 
     func goToDisplayed(index: Int) {
-        if isReviewRejectsMode {
-            guard index >= 0, index < badPhotos.count else { return }
-            rejectReviewIndex = index
-        } else {
+        if viewMode == .allPhotos {
             goTo(index: index)
+        } else {
+            guard index >= 0, index < displayedPhotos.count else { return }
+            filteredViewIndex = index
         }
     }
 
     func goToNextDisplayed() {
-        if isReviewRejectsMode {
-            if rejectReviewIndex < badPhotos.count - 1 { rejectReviewIndex += 1 }
-        } else {
+        if viewMode == .allPhotos {
             goToNext()
+        } else {
+            if filteredViewIndex < displayedPhotos.count - 1 { filteredViewIndex += 1 }
         }
     }
 
     func goToPreviousDisplayed() {
-        if isReviewRejectsMode {
-            if rejectReviewIndex > 0 { rejectReviewIndex -= 1 }
-        } else {
+        if viewMode == .allPhotos {
             goToPrevious()
+        } else {
+            if filteredViewIndex > 0 { filteredViewIndex -= 1 }
         }
     }
 
@@ -246,9 +269,9 @@ class PhotoCullerViewModel {
         guard !isAdvancing else { return }
 
         let photoIdx: Int
-        if isReviewRejectsMode {
-            guard rejectReviewIndex >= 0, rejectReviewIndex < badPhotos.count else { return }
-            let photoId = badPhotos[rejectReviewIndex].id
+        if viewMode != .allPhotos {
+            guard filteredViewIndex >= 0, filteredViewIndex < displayedPhotos.count else { return }
+            let photoId = displayedPhotos[filteredViewIndex].id
             guard let idx = photos.firstIndex(where: { $0.id == photoId }) else { return }
             photoIdx = idx
         } else {
@@ -268,13 +291,13 @@ class PhotoCullerViewModel {
 
         AuditLogger.log("RATED: \(photo.id) -> \(newRating?.rawValue ?? "unrated")", in: folderURL)
 
-        if isReviewRejectsMode {
+        if viewMode != .allPhotos {
             isAdvancing = true
             Task { @MainActor in
                 try? await Task.sleep(for: .milliseconds(100))
                 isAdvancing = false
-                let newBadCount = self.badPhotos.count
-                self.rejectReviewIndex = min(self.rejectReviewIndex, max(0, newBadCount - 1))
+                let newCount = self.displayedPhotos.count
+                self.filteredViewIndex = min(self.filteredViewIndex, max(0, newCount - 1))
             }
             return
         }
@@ -318,7 +341,9 @@ class PhotoCullerViewModel {
         photos.removeAll { badPhotoIds.contains($0.id) }
 
         // Exit Rejected Only mode so the user returns to All Photos view
-        isReviewRejectsMode = false
+        if viewMode == .rejectedOnly {
+            viewMode = .allPhotos
+        }
 
         // Adjust currentIndex to stay in bounds
         if photos.isEmpty {

@@ -74,19 +74,14 @@ struct photo_cullerApp: App {
                 Menu("Mode") {
                     Picker(
                         selection: Binding(
-                            get: { viewModel?.isReviewRejectsMode ?? false },
-                            set: { newValue in
-                                if newValue {
-                                    viewModel?.enterReviewRejectsMode()
-                                } else {
-                                    viewModel?.exitReviewRejectsMode()
-                                }
-                            }
+                            get: { viewModel?.viewMode ?? .allPhotos },
+                            set: { viewModel?.setViewMode($0) }
                         ),
                         label: EmptyView()
                     ) {
-                        Text("All Photos").tag(false)
-                        Text("Rejected Only").tag(true)
+                        Text("All Photos").tag(ViewMode.allPhotos)
+                        Text("Rejected Only").tag(ViewMode.rejectedOnly)
+                        Text("Unrated Only").tag(ViewMode.unratedOnly)
                     }
                     .pickerStyle(.inline)
                     .labelsHidden()

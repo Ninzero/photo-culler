@@ -6,19 +6,30 @@ struct PhotoReviewView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            if viewModel.isReviewRejectsMode {
+            if viewModel.viewMode != .allPhotos {
                 HStack(spacing: 6) {
-                    Image(systemName: "magnifyingglass.circle.fill")
-                    Text(viewModel.badPhotos.isEmpty
-                        ? "Rejected Only — No rejected photos"
-                        : "Rejected Only — \(viewModel.badPhotos.count) rejected photo(s)")
-                        .font(.caption)
+                    switch viewModel.viewMode {
+                    case .rejectedOnly:
+                        Image(systemName: "magnifyingglass.circle.fill")
+                        Text(viewModel.badPhotos.isEmpty
+                            ? "Rejected Only — No rejected photos"
+                            : "Rejected Only — \(viewModel.badPhotos.count) rejected photo(s)")
+                            .font(.caption)
+                    case .unratedOnly:
+                        Image(systemName: "circle.dotted")
+                        Text(viewModel.unratedPhotos.isEmpty
+                            ? "Unrated Only — No unrated photos"
+                            : "Unrated Only — \(viewModel.unratedPhotos.count) unrated photo(s)")
+                            .font(.caption)
+                    case .allPhotos:
+                        EmptyView()
+                    }
                     Spacer()
                 }
                 .padding(.horizontal, 12)
                 .padding(.vertical, 6)
-                .background(Color.orange.opacity(0.15))
-                .foregroundStyle(.orange)
+                .background(viewModel.viewMode == .rejectedOnly ? Color.orange.opacity(0.15) : Color.blue.opacity(0.15))
+                .foregroundStyle(viewModel.viewMode == .rejectedOnly ? AnyShapeStyle(.orange) : AnyShapeStyle(.blue))
             }
 
             ProgressBarView(
@@ -26,17 +37,27 @@ struct PhotoReviewView: View {
                 totalCount: viewModel.photoCount
             )
 
-            if viewModel.isReviewRejectsMode && viewModel.badPhotos.isEmpty {
+            if (viewModel.viewMode == .rejectedOnly && viewModel.badPhotos.isEmpty) ||
+               (viewModel.viewMode == .unratedOnly && viewModel.unratedPhotos.isEmpty) {
                 VStack(spacing: 12) {
                     Image(systemName: "checkmark.seal.fill")
                         .font(.system(size: 48))
                         .foregroundStyle(.green)
-                    Text("No Rejected Photos")
-                        .font(.title2)
-                        .fontWeight(.medium)
-                    Text("All photos are rated Good or unrated.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                    if viewModel.viewMode == .rejectedOnly {
+                        Text("No Rejected Photos")
+                            .font(.title2)
+                            .fontWeight(.medium)
+                        Text("All photos are rated Good or unrated.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    } else {
+                        Text("All Photos Rated")
+                            .font(.title2)
+                            .fontWeight(.medium)
+                        Text("No unrated photos remaining.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
@@ -54,7 +75,13 @@ struct PhotoReviewView: View {
 
             BottomControlBar(
                 currentIndex: viewModel.displayedCurrentIndex,
-                totalCount: viewModel.isReviewRejectsMode ? viewModel.badPhotos.count : viewModel.photoCount,
+                totalCount: {
+                    switch viewModel.viewMode {
+                    case .allPhotos:    return viewModel.photoCount
+                    case .rejectedOnly: return viewModel.badPhotos.count
+                    case .unratedOnly:  return viewModel.unratedPhotos.count
+                    }
+                }(),
                 currentRating: viewModel.displayedCurrentPhoto?.rating,
                 canGoPrevious: viewModel.displayedCanGoPrevious,
                 canGoNext: viewModel.displayedCanGoNext,
@@ -91,7 +118,7 @@ struct PhotoReviewView: View {
             }
         }
         .alert("All Photos Rated", isPresented: $viewModel.showCompletionDialog) {
-            if !viewModel.isReviewRejectsMode {
+            if viewModel.viewMode == .allPhotos {
                 Button("Review Rejected Only") {
                     viewModel.enterReviewRejectsMode()
                 }
