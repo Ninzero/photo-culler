@@ -127,6 +127,8 @@ class PhotoCullerViewModel {
                 }
             }
             photos = finalPhotos
+            RatingStore.shared.currentFolderHashes = Set(finalPhotos.flatMap { $0.fileHashes })
+            RatingStore.shared.currentFolderName = url.lastPathComponent
 
             // Jump to the first unrated photo
             if let firstUnrated = photos.firstIndex(where: { $0.rating == nil }) {
@@ -138,6 +140,8 @@ class PhotoCullerViewModel {
             AuditLogger.log("SESSION_START: Loaded \(photos.count) photos, \(store.ratings.count) total global ratings", in: url)
         } catch {
             photos = []
+            RatingStore.shared.currentFolderHashes = []
+            RatingStore.shared.currentFolderName = ""
         }
         isLoadingFolder = false
     }

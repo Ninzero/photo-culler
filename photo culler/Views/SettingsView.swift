@@ -3,6 +3,7 @@ import SwiftUI
 struct SettingsView: View {
     @Environment(ExtensionSettings.self) private var settings
     @State private var showClearRatingsAlert = false
+    @State private var showClearFolderRatingsAlert = false
     @State private var showClearCacheAlert = false
 
     var body: some View {
@@ -27,6 +28,10 @@ struct SettingsView: View {
                 Button("Clear All Ratings…", role: .destructive) {
                     showClearRatingsAlert = true
                 }
+                Button("Clear Current Folder Ratings…", role: .destructive) {
+                    showClearFolderRatingsAlert = true
+                }
+                .disabled(RatingStore.shared.currentFolderHashes.isEmpty)
                 Button("Clear Hash Cache…", role: .destructive) {
                     showClearCacheAlert = true
                 }
@@ -52,6 +57,21 @@ struct SettingsView: View {
             Button("Cancel", role: .cancel) {}
         } message: {
             Text("This will permanently delete all stored ratings across all folders. This action cannot be undone.")
+        }
+        .alert("Clear Current Folder Ratings?", isPresented: $showClearFolderRatingsAlert) {
+            Button("Clear", role: .destructive) {
+                let store = RatingStore.shared
+                let hashes = store.currentFolderHashes
+                let good = hashes.filter { store.ratings[$0] == .good }.count
+                let bad  = hashes.filter { store.ratings[$0] == .bad  }.count
+                let total = good + bad
+                let folderName = store.currentFolderName
+                store.clearCurrentFolder()
+                AuditLogger.log("Cleared current folder ratings (\(folderName)): \(total) total (\(good) good, \(bad) bad)")
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("This will permanently delete all ratings for photos in the current folder (\(RatingStore.shared.currentFolderName)). This action cannot be undone.")
         }
         .alert("Clear Hash Cache?", isPresented: $showClearCacheAlert) {
             Button("Clear", role: .destructive) {

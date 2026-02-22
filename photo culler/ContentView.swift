@@ -10,6 +10,7 @@ import SwiftUI
 struct ContentView: View {
     @State private var viewModel = PhotoCullerViewModel()
     @Environment(ExtensionSettings.self) private var extensionSettings
+    @Environment(\.controlActiveState) private var controlActiveState
 
     var body: some View {
         Group {
@@ -37,6 +38,16 @@ struct ContentView: View {
         }
         .environment(viewModel)
         .focusedSceneValue(\.viewModel, viewModel)
+        .onChange(of: controlActiveState) { _, newValue in
+            guard newValue == .key else { return }
+            if viewModel.photos.isEmpty {
+                RatingStore.shared.currentFolderHashes = []
+                RatingStore.shared.currentFolderName = ""
+            } else {
+                RatingStore.shared.currentFolderHashes = Set(viewModel.photos.flatMap { $0.fileHashes })
+                RatingStore.shared.currentFolderName = viewModel.folderURL?.lastPathComponent ?? ""
+            }
+        }
     }
 }
 

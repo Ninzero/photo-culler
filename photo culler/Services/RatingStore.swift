@@ -9,6 +9,8 @@ extension Notification.Name {
     static let shared = RatingStore()
 
     private(set) var ratings: [String: Rating]
+    var currentFolderHashes: Set<String> = []
+    var currentFolderName: String = ""
 
     private init() {
         ratings = RatingStore.loadFromDisk()
@@ -42,6 +44,18 @@ extension Notification.Name {
         NotificationCenter.default.post(name: .ratingsDidChange, object: nil, userInfo: ["changedHashes": Set<String>()])
         Task.detached {
             RatingStore.saveToDisk([:])
+        }
+    }
+
+    /// 清除当前文件夹所有照片的评价。
+    func clearCurrentFolder() {
+        let hashes = currentFolderHashes
+        guard !hashes.isEmpty else { return }
+        for hash in hashes { ratings.removeValue(forKey: hash) }
+        NotificationCenter.default.post(name: .ratingsDidChange, object: nil, userInfo: ["changedHashes": hashes])
+        let snapshot = ratings
+        Task.detached {
+            RatingStore.saveToDisk(snapshot)
         }
     }
 
