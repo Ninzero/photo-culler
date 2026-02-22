@@ -24,6 +24,18 @@ struct SettingsView: View {
                 }
             }
 
+            Section("Matching Mode") {
+                Picker("Mode", selection: $settings.matchingMode) {
+                    ForEach(MatchingMode.allCases, id: \.self) { mode in
+                        Text(mode.displayName).tag(mode)
+                    }
+                }
+                .pickerStyle(.radioGroup)
+                Text("Hash mode stores ratings by file content — survives folder moves and renames. Path mode skips hashing for faster loading, but ratings are tied to file location.")
+                    .foregroundStyle(.secondary)
+                    .font(.callout)
+            }
+
             Section("Data") {
                 Button("Clear All Ratings…", role: .destructive) {
                     showClearRatingsAlert = true
@@ -31,7 +43,7 @@ struct SettingsView: View {
                 Button("Clear Current Folder Ratings…", role: .destructive) {
                     showClearFolderRatingsAlert = true
                 }
-                .disabled(RatingStore.shared.currentFolderHashes.isEmpty)
+                .disabled(RatingStore.shared.currentFolderKeys.isEmpty)
                 Button("Clear Hash Cache…", role: .destructive) {
                     showClearCacheAlert = true
                 }
@@ -61,9 +73,9 @@ struct SettingsView: View {
         .alert("Clear Current Folder Ratings?", isPresented: $showClearFolderRatingsAlert) {
             Button("Clear", role: .destructive) {
                 let store = RatingStore.shared
-                let hashes = store.currentFolderHashes
-                let good = hashes.filter { store.ratings[$0] == .good }.count
-                let bad  = hashes.filter { store.ratings[$0] == .bad  }.count
+                let keys = store.currentFolderKeys
+                let good = keys.filter { store.ratings[$0] == .good }.count
+                let bad  = keys.filter { store.ratings[$0] == .bad  }.count
                 let total = good + bad
                 let folderName = store.currentFolderName
                 store.clearCurrentFolder()

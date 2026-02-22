@@ -89,7 +89,8 @@ struct photo_cullerApp: App {
                 await viewModel?.loadFolder(
                     url: url,
                     rawExtensions: extensionSettings.rawExtensions,
-                    outputExtensions: extensionSettings.outputExtensions
+                    outputExtensions: extensionSettings.outputExtensions,
+                    matchingMode: extensionSettings.matchingMode
                 )
             }
         }

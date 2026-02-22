@@ -20,7 +20,7 @@ xcodebuild -project "photo culler.xcodeproj" -scheme "photo culler" build
 ### 筛选流程
 
 1. `⌘+O` 或点击界面按钮选择照片文件夹
-2. 应用按文件名（basename）将 RAW 与输出格式配对，加载期间并发计算文件哈希
+2. 应用按文件名（basename）将 RAW 与输出格式配对；哈希模式下并发计算文件哈希，路径模式下跳过哈希直接加载
 3. 逐张审阅，用键盘快速评价
 4. 全部评价完成后自动弹出删除确认，或随时通过 `⌘+D` 手动触发
 
@@ -42,15 +42,18 @@ xcodebuild -project "photo culler.xcodeproj" -scheme "photo culler" build
 
 ### 评价持久化
 
-评价以文件内容 SHA-256（前 4 MB）为 key 存储，文件夹移动或重命名后评价依然有效。
+支持两种匹配模式，可在 Settings 切换，切换后下次打开文件夹时生效：
+
+- **Hash 模式**（默认）：以文件内容 SHA-256（前 4 MB）为 key，文件夹移动或重命名后评价依然有效
+- **Path 模式**：以文件绝对路径（去扩展名）为 key，跳过哈希计算、加载更快，但路径变动后评价失效
 
 ### 右侧缩略图条
 
 悬停右侧边缘展开，显示全部照片及评价徽章，点击可直接跳转。
 
-### 自定义扩展名
+### 自定义扩展名与匹配模式
 
-在 Settings 窗口可自定义 RAW 和输出格式扩展名。
+在 Settings 窗口可自定义 RAW 和输出格式扩展名，以及切换匹配模式（Hash / Path）。
 
 默认 RAW 扩展名：`.3fr` `.arw` `.cr2` `.cr3` `.dng` `.fff` `.nef` `.raf` `.raw` `.rwl`
 
@@ -58,7 +61,7 @@ xcodebuild -project "photo culler.xcodeproj" -scheme "photo culler" build
 
 ## 数据存储
 
-所有删除操作均记录审计日志。哈希缓存可安全删除，下次打开文件夹时自动重建。
+所有删除操作均记录审计日志。哈希缓存可安全删除，下次打开文件夹时自动重建。两种匹配模式的评价数据共存于同一 `ratings.json`，互不影响。
 
 ## 项目结构
 

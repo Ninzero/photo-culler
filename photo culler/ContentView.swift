@@ -30,7 +30,8 @@ struct ContentView: View {
                         await viewModel.loadFolder(
                             url: url,
                             rawExtensions: extensionSettings.rawExtensions,
-                            outputExtensions: extensionSettings.outputExtensions
+                            outputExtensions: extensionSettings.outputExtensions,
+                            matchingMode: extensionSettings.matchingMode
                         )
                     }
                 }
@@ -41,10 +42,13 @@ struct ContentView: View {
         .onChange(of: controlActiveState) { _, newValue in
             guard newValue == .key else { return }
             if viewModel.photos.isEmpty {
-                RatingStore.shared.currentFolderHashes = []
+                RatingStore.shared.currentFolderKeys = []
                 RatingStore.shared.currentFolderName = ""
             } else {
-                RatingStore.shared.currentFolderHashes = Set(viewModel.photos.flatMap { $0.fileHashes })
+                let keys: Set<String> = viewModel.matchingMode == .path
+                    ? Set(viewModel.photos.map { $0.pathKey })
+                    : Set(viewModel.photos.flatMap { $0.fileHashes })
+                RatingStore.shared.currentFolderKeys = keys
                 RatingStore.shared.currentFolderName = viewModel.folderURL?.lastPathComponent ?? ""
             }
         }

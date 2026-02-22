@@ -9,7 +9,7 @@ extension Notification.Name {
     static let shared = RatingStore()
 
     private(set) var ratings: [String: Rating]
-    var currentFolderHashes: Set<String> = []
+    var currentFolderKeys: Set<String> = []
     var currentFolderName: String = ""
 
     private init() {
@@ -17,20 +17,20 @@ extension Notification.Name {
     }
 
     /// 设置或清除评价（nil = 撤销）。更新内存后立即通知其他 ViewModel，并异步写盘。
-    func applyRating(_ rating: Rating?, forHashes hashes: [String]) {
-        guard !hashes.isEmpty else { return }
-        for hash in hashes {
+    func applyRating(_ rating: Rating?, forKeys keys: [String]) {
+        guard !keys.isEmpty else { return }
+        for key in keys {
             if let rating {
-                ratings[hash] = rating
+                ratings[key] = rating
             } else {
-                ratings.removeValue(forKey: hash)
+                ratings.removeValue(forKey: key)
             }
         }
-        let changed = Set(hashes)
+        let changed = Set(keys)
         NotificationCenter.default.post(
             name: .ratingsDidChange,
             object: nil,
-            userInfo: ["changedHashes": changed]
+            userInfo: ["changedKeys": changed]
         )
         let snapshot = ratings
         Task.detached {
@@ -41,7 +41,7 @@ extension Notification.Name {
     /// 清除全部评价。
     func clearAll() {
         ratings = [:]
-        NotificationCenter.default.post(name: .ratingsDidChange, object: nil, userInfo: ["changedHashes": Set<String>()])
+        NotificationCenter.default.post(name: .ratingsDidChange, object: nil, userInfo: ["changedKeys": Set<String>()])
         Task.detached {
             RatingStore.saveToDisk([:])
         }
@@ -49,10 +49,10 @@ extension Notification.Name {
 
     /// 清除当前文件夹所有照片的评价。
     func clearCurrentFolder() {
-        let hashes = currentFolderHashes
-        guard !hashes.isEmpty else { return }
-        for hash in hashes { ratings.removeValue(forKey: hash) }
-        NotificationCenter.default.post(name: .ratingsDidChange, object: nil, userInfo: ["changedHashes": hashes])
+        let keys = currentFolderKeys
+        guard !keys.isEmpty else { return }
+        for key in keys { ratings.removeValue(forKey: key) }
+        NotificationCenter.default.post(name: .ratingsDidChange, object: nil, userInfo: ["changedKeys": keys])
         let snapshot = ratings
         Task.detached {
             RatingStore.saveToDisk(snapshot)

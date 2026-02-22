@@ -10,4 +10,8 @@ struct PhotoItem: Identifiable {
     var displayURL: URL? {
         outputURL ?? rawURL
     }
+
+    var pathKey: String {
+        (rawURL ?? outputURL)?.deletingPathExtension().path ?? id
+    }
 }

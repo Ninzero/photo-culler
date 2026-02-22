@@ -11,6 +11,7 @@ class PhotoCullerViewModel {
     var deletionResultMessage: String = ""
 
     var isLoadingFolder = false
+    private(set) var matchingMode: MatchingMode = .hash
 
     private var isAdvancing = false
     private var ratingsObserver: NSObjectProtocol?
@@ -21,8 +22,8 @@ class PhotoCullerViewModel {
             object: nil,
             queue: .main
         ) { [weak self] notification in
-            let changed = notification.userInfo?["changedHashes"] as? Set<String> ?? Set<String>()
-            self?.syncRatingsFromStore(changedHashes: changed)
+            let changed = notification.userInfo?["changedKeys"] as? Set<String> ?? Set<String>()
+            self?.syncRatingsFromStore(changedKeys: changed)
         }
     }
 
@@ -32,17 +33,19 @@ class PhotoCullerViewModel {
         }
     }
 
-    private func syncRatingsFromStore(changedHashes: Set<String>) {
+    private func syncRatingsFromStore(changedKeys: Set<String>) {
         // clearAll 传空集合时全量同步
-        if changedHashes.isEmpty {
+        if changedKeys.isEmpty {
             for i in photos.indices {
                 photos[i].rating = nil
             }
             return
         }
         for i in photos.indices {
-            guard photos[i].fileHashes.contains(where: { changedHashes.contains($0) }) else { continue }
-            photos[i].rating = photos[i].fileHashes.compactMap { RatingStore.shared.ratings[$0] }.first
+            let photoKeys: Set<String> = matchingMode == .path
+                ? [photos[i].pathKey] : Set(photos[i].fileHashes)
+            guard photoKeys.contains(where: { changedKeys.contains($0) }) else { continue }
+            photos[i].rating = photoKeys.compactMap { RatingStore.shared.ratings[$0] }.first
         }
     }
 
@@ -86,48 +89,54 @@ class PhotoCullerViewModel {
     func loadFolder(
         url: URL,
         rawExtensions: Set<String> = ExtensionSettings.defaultRawExtensions,
-        outputExtensions: Set<String> = ExtensionSettings.defaultOutputExtensions
+        outputExtensions: Set<String> = ExtensionSettings.defaultOutputExtensions,
+        matchingMode: MatchingMode = .hash
     ) async {
+        self.matchingMode = matchingMode
         isLoadingFolder = true
         folderURL = url
         do {
             let scannedPhotos = try PhotoScanner.scan(folderURL: url, rawExtensions: rawExtensions, outputExtensions: outputExtensions)
 
-            // Compute file hashes concurrently using withTaskGroup (both RAW and output)
-            var hashResults = [(Int, [String])](repeating: (0, []), count: scannedPhotos.count)
-            await withTaskGroup(of: (Int, [String]).self) { group in
-                for i in scannedPhotos.indices {
-                    let rawURL = scannedPhotos[i].rawURL
-                    let outputURL = scannedPhotos[i].outputURL
-                    group.addTask {
-                        var hashes: [String] = []
-                        if let url = rawURL, let h = await FileHasher.shared.hash(for: url) { hashes.append(h) }
-                        if let url = outputURL, let h = await FileHasher.shared.hash(for: url) { hashes.append(h) }
-                        return (i, hashes)
+            var finalPhotos = scannedPhotos
+            if matchingMode == .hash {
+                // Compute file hashes concurrently using withTaskGroup (both RAW and output)
+                var hashResults = [(Int, [String])](repeating: (0, []), count: scannedPhotos.count)
+                await withTaskGroup(of: (Int, [String]).self) { group in
+                    for i in scannedPhotos.indices {
+                        let rawURL = scannedPhotos[i].rawURL
+                        let outputURL = scannedPhotos[i].outputURL
+                        group.addTask {
+                            var hashes: [String] = []
+                            if let url = rawURL, let h = await FileHasher.shared.hash(for: url) { hashes.append(h) }
+                            if let url = outputURL, let h = await FileHasher.shared.hash(for: url) { hashes.append(h) }
+                            return (i, hashes)
+                        }
+                    }
+                    for await (i, hashes) in group {
+                        hashResults[i] = (i, hashes)
                     }
                 }
-                for await (i, hashes) in group {
-                    hashResults[i] = (i, hashes)
-                }
+
+                await FileHasher.shared.persistCache()
+
+                for (i, hashes) in hashResults { finalPhotos[i].fileHashes = hashes }
             }
+            // 路径模式：fileHashes 保持空 []
 
-            await FileHasher.shared.persistCache()
-
-            var finalPhotos = scannedPhotos
-            for (i, hashes) in hashResults { finalPhotos[i].fileHashes = hashes }
-
-            // Apply ratings from shared store by hash (match any file hash)
+            // Apply ratings from shared store
             let store = RatingStore.shared
             for i in finalPhotos.indices {
-                for hash in finalPhotos[i].fileHashes {
-                    if let rating = store.ratings[hash] {
-                        finalPhotos[i].rating = rating
-                        break
-                    }
+                let keys: [String] = matchingMode == .path
+                    ? [finalPhotos[i].pathKey] : finalPhotos[i].fileHashes
+                for key in keys {
+                    if let rating = store.ratings[key] { finalPhotos[i].rating = rating; break }
                 }
             }
             photos = finalPhotos
-            RatingStore.shared.currentFolderHashes = Set(finalPhotos.flatMap { $0.fileHashes })
+            RatingStore.shared.currentFolderKeys = matchingMode == .path
+                ? Set(finalPhotos.map { $0.pathKey })
+                : Set(finalPhotos.flatMap { $0.fileHashes })
             RatingStore.shared.currentFolderName = url.lastPathComponent
 
             // Jump to the first unrated photo
@@ -140,7 +149,7 @@ class PhotoCullerViewModel {
             AuditLogger.log("SESSION_START: Loaded \(photos.count) photos, \(store.ratings.count) total global ratings", in: url)
         } catch {
             photos = []
-            RatingStore.shared.currentFolderHashes = []
+            RatingStore.shared.currentFolderKeys = []
             RatingStore.shared.currentFolderName = ""
         }
         isLoadingFolder = false
@@ -172,9 +181,10 @@ class PhotoCullerViewModel {
         let newRating: Rating? = photos[currentIndex].rating == rating ? nil : rating
         photos[currentIndex].rating = newRating
 
-        // Persist rating keyed by all file hashes via shared store
-        if !photo.fileHashes.isEmpty {
-            RatingStore.shared.applyRating(newRating, forHashes: photo.fileHashes)
+        // Persist rating keyed by path or file hashes via shared store
+        let keys: [String] = matchingMode == .path ? [photo.pathKey] : photo.fileHashes
+        if !keys.isEmpty {
+            RatingStore.shared.applyRating(newRating, forKeys: keys)
         }
 
         AuditLogger.log("RATED: \(photo.id) -> \(newRating?.rawValue ?? "unrated")", in: folderURL)
@@ -204,9 +214,10 @@ class PhotoCullerViewModel {
         let result = PhotoDeleter.deleteBadPhotos(from: photos, in: folderURL)
         deletionResultMessage = result.summary
 
-        // Remove deleted photos' hashes from shared store
+        // Remove deleted photos' keys from shared store
         for p in photos where p.rating == .bad {
-            RatingStore.shared.applyRating(nil, forHashes: p.fileHashes)
+            let keys: [String] = matchingMode == .path ? [p.pathKey] : p.fileHashes
+            RatingStore.shared.applyRating(nil, forKeys: keys)
         }
 
         // Remove bad photos from in-memory state
