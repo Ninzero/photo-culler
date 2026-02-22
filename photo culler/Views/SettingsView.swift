@@ -42,11 +42,12 @@ struct SettingsView: View {
         .frame(width: 400, height: 600)
         .alert("Clear All Ratings?", isPresented: $showClearRatingsAlert) {
             Button("Clear", role: .destructive) {
-                let existing = RatingStore.load()
-                let good = existing.values.filter { $0 == .good }.count
-                let bad  = existing.values.filter { $0 == .bad  }.count
-                RatingStore.save([:])
-                AuditLogger.log("Cleared all ratings: \(existing.count) total (\(good) good, \(bad) bad)")
+                let store = RatingStore.shared
+                let good = store.ratings.values.filter { $0 == .good }.count
+                let bad  = store.ratings.values.filter { $0 == .bad  }.count
+                let total = store.ratings.count
+                store.clearAll()
+                AuditLogger.log("Cleared all ratings: \(total) total (\(good) good, \(bad) bad)")
             }
             Button("Cancel", role: .cancel) {}
         } message: {

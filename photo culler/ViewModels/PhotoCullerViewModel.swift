@@ -12,8 +12,39 @@ class PhotoCullerViewModel {
 
     var isLoadingFolder = false
 
-    private var globalRatings: [String: Rating] = [:]
     private var isAdvancing = false
+    private var ratingsObserver: NSObjectProtocol?
+
+    init() {
+        ratingsObserver = NotificationCenter.default.addObserver(
+            forName: .ratingsDidChange,
+            object: nil,
+            queue: .main
+        ) { [weak self] notification in
+            let changed = notification.userInfo?["changedHashes"] as? Set<String> ?? Set<String>()
+            self?.syncRatingsFromStore(changedHashes: changed)
+        }
+    }
+
+    deinit {
+        if let obs = ratingsObserver {
+            NotificationCenter.default.removeObserver(obs)
+        }
+    }
+
+    private func syncRatingsFromStore(changedHashes: Set<String>) {
+        // clearAll 传空集合时全量同步
+        if changedHashes.isEmpty {
+            for i in photos.indices {
+                photos[i].rating = nil
+            }
+            return
+        }
+        for i in photos.indices {
+            guard photos[i].fileHashes.contains(where: { changedHashes.contains($0) }) else { continue }
+            photos[i].rating = photos[i].fileHashes.compactMap { RatingStore.shared.ratings[$0] }.first
+        }
+    }
 
     var hasLoadedFolder: Bool {
         folderURL != nil
@@ -85,11 +116,11 @@ class PhotoCullerViewModel {
             var finalPhotos = scannedPhotos
             for (i, hashes) in hashResults { finalPhotos[i].fileHashes = hashes }
 
-            // Load global ratings and apply by hash (match any file hash)
-            globalRatings = RatingStore.load()
+            // Apply ratings from shared store by hash (match any file hash)
+            let store = RatingStore.shared
             for i in finalPhotos.indices {
                 for hash in finalPhotos[i].fileHashes {
-                    if let rating = globalRatings[hash] {
+                    if let rating = store.ratings[hash] {
                         finalPhotos[i].rating = rating
                         break
                     }
@@ -104,7 +135,7 @@ class PhotoCullerViewModel {
                 currentIndex = 0
             }
 
-            AuditLogger.log("SESSION_START: Loaded \(photos.count) photos, \(globalRatings.count) total global ratings", in: url)
+            AuditLogger.log("SESSION_START: Loaded \(photos.count) photos, \(store.ratings.count) total global ratings", in: url)
         } catch {
             photos = []
         }
@@ -137,16 +168,9 @@ class PhotoCullerViewModel {
         let newRating: Rating? = photos[currentIndex].rating == rating ? nil : rating
         photos[currentIndex].rating = newRating
 
-        // Persist rating keyed by all file hashes
-        for hash in photo.fileHashes {
-            if let newRating {
-                globalRatings[hash] = newRating
-            } else {
-                globalRatings.removeValue(forKey: hash)
-            }
-        }
+        // Persist rating keyed by all file hashes via shared store
         if !photo.fileHashes.isEmpty {
-            RatingStore.save(globalRatings)
+            RatingStore.shared.applyRating(newRating, forHashes: photo.fileHashes)
         }
 
         AuditLogger.log("RATED: \(photo.id) -> \(newRating?.rawValue ?? "unrated")", in: folderURL)
@@ -176,17 +200,13 @@ class PhotoCullerViewModel {
         let result = PhotoDeleter.deleteBadPhotos(from: photos, in: folderURL)
         deletionResultMessage = result.summary
 
-        // Remove deleted photos' hashes from global ratings
+        // Remove deleted photos' hashes from shared store
         for p in photos where p.rating == .bad {
-            for hash in p.fileHashes {
-                globalRatings.removeValue(forKey: hash)
-            }
+            RatingStore.shared.applyRating(nil, forHashes: p.fileHashes)
         }
 
         // Remove bad photos from in-memory state
         photos.removeAll { $0.rating == .bad }
-
-        RatingStore.save(globalRatings)
 
         // Adjust currentIndex to stay in bounds
         if photos.isEmpty {
