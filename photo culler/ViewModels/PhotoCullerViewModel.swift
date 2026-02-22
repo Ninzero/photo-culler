@@ -13,6 +13,9 @@ class PhotoCullerViewModel {
     var isLoadingFolder = false
     private(set) var matchingMode: MatchingMode = .hash
 
+    var isReviewRejectsMode: Bool = false
+    private var rejectReviewIndex: Int = 0
+
     private var isAdvancing = false
     private var ratingsObserver: NSObjectProtocol?
 
@@ -86,6 +89,34 @@ class PhotoCullerViewModel {
         photos.filter { $0.rating == .bad }.count
     }
 
+    var badPhotos: [PhotoItem] {
+        photos.filter { $0.rating == .bad }
+    }
+
+    var displayedPhotos: [PhotoItem] {
+        isReviewRejectsMode ? badPhotos : photos
+    }
+
+    var displayedCurrentIndex: Int {
+        isReviewRejectsMode ? rejectReviewIndex : currentIndex
+    }
+
+    var displayedCurrentPhoto: PhotoItem? {
+        if isReviewRejectsMode {
+            guard rejectReviewIndex >= 0, rejectReviewIndex < badPhotos.count else { return nil }
+            return badPhotos[rejectReviewIndex]
+        }
+        return currentPhoto
+    }
+
+    var displayedCanGoNext: Bool {
+        isReviewRejectsMode ? rejectReviewIndex < badPhotos.count - 1 : canGoNext
+    }
+
+    var displayedCanGoPrevious: Bool {
+        isReviewRejectsMode ? rejectReviewIndex > 0 : canGoPrevious
+    }
+
     func loadFolder(
         url: URL,
         rawExtensions: Set<String> = ExtensionSettings.defaultRawExtensions,
@@ -155,6 +186,44 @@ class PhotoCullerViewModel {
         isLoadingFolder = false
     }
 
+    func enterReviewRejectsMode() {
+        isReviewRejectsMode = true
+        rejectReviewIndex = 0
+    }
+
+    func exitReviewRejectsMode() {
+        if let current = displayedCurrentPhoto,
+           let idx = photos.firstIndex(where: { $0.id == current.id }) {
+            currentIndex = idx
+        }
+        isReviewRejectsMode = false
+    }
+
+    func goToDisplayed(index: Int) {
+        if isReviewRejectsMode {
+            guard index >= 0, index < badPhotos.count else { return }
+            rejectReviewIndex = index
+        } else {
+            goTo(index: index)
+        }
+    }
+
+    func goToNextDisplayed() {
+        if isReviewRejectsMode {
+            if rejectReviewIndex < badPhotos.count - 1 { rejectReviewIndex += 1 }
+        } else {
+            goToNext()
+        }
+    }
+
+    func goToPreviousDisplayed() {
+        if isReviewRejectsMode {
+            if rejectReviewIndex > 0 { rejectReviewIndex -= 1 }
+        } else {
+            goToPrevious()
+        }
+    }
+
     func goToNext() {
         if canGoNext {
             currentIndex += 1
@@ -173,13 +242,23 @@ class PhotoCullerViewModel {
     }
 
     func rateCurrent(_ rating: Rating) {
-        guard !photos.isEmpty, currentIndex >= 0, currentIndex < photos.count else { return }
         guard let folderURL else { return }
         guard !isAdvancing else { return }
 
-        let photo = photos[currentIndex]
-        let newRating: Rating? = photos[currentIndex].rating == rating ? nil : rating
-        photos[currentIndex].rating = newRating
+        let photoIdx: Int
+        if isReviewRejectsMode {
+            guard rejectReviewIndex >= 0, rejectReviewIndex < badPhotos.count else { return }
+            let photoId = badPhotos[rejectReviewIndex].id
+            guard let idx = photos.firstIndex(where: { $0.id == photoId }) else { return }
+            photoIdx = idx
+        } else {
+            guard !photos.isEmpty, currentIndex >= 0, currentIndex < photos.count else { return }
+            photoIdx = currentIndex
+        }
+
+        let photo = photos[photoIdx]
+        let newRating: Rating? = photos[photoIdx].rating == rating ? nil : rating
+        photos[photoIdx].rating = newRating
 
         // Persist rating keyed by path or file hashes via shared store
         let keys: [String] = matchingMode == .path ? [photo.pathKey] : photo.fileHashes
@@ -188,6 +267,17 @@ class PhotoCullerViewModel {
         }
 
         AuditLogger.log("RATED: \(photo.id) -> \(newRating?.rawValue ?? "unrated")", in: folderURL)
+
+        if isReviewRejectsMode {
+            isAdvancing = true
+            Task { @MainActor in
+                try? await Task.sleep(for: .milliseconds(100))
+                isAdvancing = false
+                let newBadCount = self.badPhotos.count
+                self.rejectReviewIndex = min(self.rejectReviewIndex, max(0, newBadCount - 1))
+            }
+            return
+        }
 
         guard newRating != nil else { return }   // 撤销评价时不自动跳转
 

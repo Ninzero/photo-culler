@@ -69,6 +69,18 @@ struct photo_cullerApp: App {
                 .keyboardShortcut("d", modifiers: .command)
                 .disabled(!(viewModel?.hasLoadedFolder ?? false) || (viewModel?.badCount ?? 0) == 0)
             }
+            CommandMenu("View") {
+                Button("Normal") {
+                    viewModel?.exitReviewRejectsMode()
+                }
+                .disabled(!(viewModel?.hasLoadedFolder ?? false) || !(viewModel?.isReviewRejectsMode ?? false))
+
+                Button("Review Rejects") {
+                    viewModel?.enterReviewRejectsMode()
+                }
+                .keyboardShortcut("r", modifiers: [.command, .shift])
+                .disabled(!(viewModel?.hasLoadedFolder ?? false) || (viewModel?.isReviewRejectsMode ?? false))
+            }
         }
 
         Settings {

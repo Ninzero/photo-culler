@@ -6,14 +6,44 @@ struct PhotoReviewView: View {
 
     var body: some View {
         VStack(spacing: 0) {
+            if viewModel.isReviewRejectsMode {
+                HStack(spacing: 6) {
+                    Image(systemName: "magnifyingglass.circle.fill")
+                    Text(viewModel.badPhotos.isEmpty
+                        ? "Review Rejects — No rejected photos"
+                        : "Review Rejects — \(viewModel.badPhotos.count) rejected photo(s)")
+                        .font(.caption)
+                    Spacer()
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 6)
+                .background(Color.orange.opacity(0.15))
+                .foregroundStyle(.orange)
+            }
+
             ProgressBarView(
                 ratedCount: viewModel.ratedCount,
                 totalCount: viewModel.photoCount
             )
 
-            PhotoDisplayView(url: viewModel.currentPhoto?.displayURL)
+            if viewModel.isReviewRejectsMode && viewModel.badPhotos.isEmpty {
+                VStack(spacing: 12) {
+                    Image(systemName: "checkmark.seal.fill")
+                        .font(.system(size: 48))
+                        .foregroundStyle(.green)
+                    Text("No Rejected Photos")
+                        .font(.title2)
+                        .fontWeight(.medium)
+                    Text("All photos are rated Good or unrated.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else {
+                PhotoDisplayView(url: viewModel.displayedCurrentPhoto?.displayURL)
+            }
 
-            if let photo = viewModel.currentPhoto {
+            if let photo = viewModel.displayedCurrentPhoto {
                 Text(photo.displayURL?.lastPathComponent ?? photo.id)
                     .font(.caption)
                     .foregroundStyle(.secondary)
@@ -23,13 +53,13 @@ struct PhotoReviewView: View {
             Divider()
 
             BottomControlBar(
-                currentIndex: viewModel.currentIndex,
-                totalCount: viewModel.photoCount,
-                currentRating: viewModel.currentPhoto?.rating,
-                canGoPrevious: viewModel.canGoPrevious,
-                canGoNext: viewModel.canGoNext,
-                onPrevious: { viewModel.goToPrevious() },
-                onNext: { viewModel.goToNext() },
+                currentIndex: viewModel.displayedCurrentIndex,
+                totalCount: viewModel.isReviewRejectsMode ? viewModel.badPhotos.count : viewModel.photoCount,
+                currentRating: viewModel.displayedCurrentPhoto?.rating,
+                canGoPrevious: viewModel.displayedCanGoPrevious,
+                canGoNext: viewModel.displayedCanGoNext,
+                onPrevious: { viewModel.goToPreviousDisplayed() },
+                onNext: { viewModel.goToNextDisplayed() },
                 onRate: { rating in viewModel.rateCurrent(rating) }
             )
         }
@@ -44,9 +74,9 @@ struct PhotoReviewView: View {
                 if showThumbnails {
                     Divider()
                     ThumbnailStripView(
-                        photos: viewModel.photos,
-                        currentIndex: viewModel.currentIndex,
-                        onSelect: { index in viewModel.goTo(index: index) }
+                        photos: viewModel.displayedPhotos,
+                        currentIndex: viewModel.displayedCurrentIndex,
+                        onSelect: { index in viewModel.goToDisplayed(index: index) }
                     )
                     .transition(.move(edge: .trailing).combined(with: .opacity))
                 }
