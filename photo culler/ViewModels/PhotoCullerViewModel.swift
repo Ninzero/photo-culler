@@ -293,11 +293,15 @@ class PhotoCullerViewModel {
 
         if viewMode != .allPhotos {
             isAdvancing = true
+            let shouldShowCompletion = viewMode == .unratedOnly && newRating != nil && allRated
             Task { @MainActor in
                 try? await Task.sleep(for: .milliseconds(100))
                 isAdvancing = false
                 let newCount = self.displayedPhotos.count
                 self.filteredViewIndex = min(self.filteredViewIndex, max(0, newCount - 1))
+                if shouldShowCompletion {
+                    self.showCompletionDialog = true
+                }
             }
             return
         }
