@@ -85,8 +85,8 @@ struct photo_cullerApp: App {
                         ),
                         label: EmptyView()
                     ) {
-                        Text("Normal").tag(false)
-                        Text("Review Rejects").tag(true)
+                        Text("All Photos").tag(false)
+                        Text("Rejected Only").tag(true)
                     }
                     .pickerStyle(.inline)
                     .labelsHidden()

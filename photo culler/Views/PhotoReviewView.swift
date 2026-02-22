@@ -10,8 +10,8 @@ struct PhotoReviewView: View {
                 HStack(spacing: 6) {
                     Image(systemName: "magnifyingglass.circle.fill")
                     Text(viewModel.badPhotos.isEmpty
-                        ? "Review Rejects — No rejected photos"
-                        : "Review Rejects — \(viewModel.badPhotos.count) rejected photo(s)")
+                        ? "Rejected Only — No rejected photos"
+                        : "Rejected Only — \(viewModel.badPhotos.count) rejected photo(s)")
                         .font(.caption)
                     Spacer()
                 }
@@ -91,6 +91,11 @@ struct PhotoReviewView: View {
             }
         }
         .alert("All Photos Rated", isPresented: $viewModel.showCompletionDialog) {
+            if !viewModel.isReviewRejectsMode {
+                Button("Review Rejected Only") {
+                    viewModel.enterReviewRejectsMode()
+                }
+            }
             Button("Delete \(viewModel.badCount) Bad Photo(s)", role: .destructive) {
                 viewModel.confirmDeletion()
             }
