@@ -118,7 +118,7 @@ struct PhotoReviewView: View {
             }
         }
         .alert("All Photos Rated", isPresented: $viewModel.showCompletionDialog) {
-            if viewModel.viewMode == .allPhotos {
+            if viewModel.viewMode == .allPhotos || viewModel.viewMode == .unratedOnly {
                 Button("Review Rejected Only") {
                     viewModel.enterReviewRejectsMode()
                 }
