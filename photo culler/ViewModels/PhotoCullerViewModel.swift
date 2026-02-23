@@ -15,6 +15,9 @@ class PhotoCullerViewModel {
     var showCompletionDialog: Bool = false
     var showDeletionResult: Bool = false
     var deletionResultMessage: String = ""
+    var showRenameSheet: Bool = false
+    var resultAlertTitle: String = "Deletion Complete"
+    var hasJustRenamed: Bool = false
 
     var isLoadingFolder = false
     private(set) var matchingMode: MatchingMode = .hash
@@ -23,6 +26,7 @@ class PhotoCullerViewModel {
     private var filteredViewIndex: Int = 0
 
     private var isAdvancing = false
+    private var isSuspendingRatingsSync = false
     private var ratingsObserver: NSObjectProtocol?
 
     init() {
@@ -43,6 +47,7 @@ class PhotoCullerViewModel {
     }
 
     private func syncRatingsFromStore(changedKeys: Set<String>) {
+        guard !isSuspendingRatingsSync else { return }
         // clearAll 传空集合时全量同步
         if changedKeys.isEmpty {
             for i in photos.indices {
@@ -356,11 +361,58 @@ class PhotoCullerViewModel {
             currentIndex = photos.count - 1
         }
 
+        resultAlertTitle = "Deletion Complete"
         showDeletionResult = true
     }
 
     func cancelDeletion() {
         guard let folderURL else { return }
         AuditLogger.log("DELETION_CANCELLED: User cancelled deletion", in: folderURL)
+    }
+
+    func performRename(seriesName: String) {
+        guard let folderURL, !photos.isEmpty else { return }
+        let photosSnapshot = photos
+        let currentMode = matchingMode
+        let trimmed = seriesName.trimmingCharacters(in: .whitespaces)
+
+        showRenameSheet = false
+
+        Task { @MainActor in
+            let result = PhotoRenamer.rename(photos: photosSnapshot, seriesName: trimmed, in: folderURL)
+
+            self.photos = result.renamedPhotos
+
+            if currentMode == .path {
+                self.updateRatingStoreAfterRename(
+                    oldPhotos: photosSnapshot,
+                    newPhotos: result.renamedPhotos
+                )
+                RatingStore.shared.currentFolderKeys = Set(result.renamedPhotos.map { $0.pathKey })
+            }
+
+            self.resultAlertTitle = "Rename Complete"
+            self.hasJustRenamed = true
+            self.deletionResultMessage = result.summary
+            self.showDeletionResult = true
+        }
+    }
+
+    @MainActor
+    private func updateRatingStoreAfterRename(
+        oldPhotos: [PhotoItem],
+        newPhotos: [PhotoItem]
+    ) {
+        isSuspendingRatingsSync = true
+        for (old, new) in zip(oldPhotos, newPhotos) {
+            let oldKey = old.pathKey
+            let newKey = new.pathKey
+            guard oldKey != newKey else { continue }
+            if let rating = RatingStore.shared.ratings[oldKey] {
+                RatingStore.shared.applyRating(rating, forKeys: [newKey])
+            }
+            RatingStore.shared.applyRating(nil, forKeys: [oldKey])
+        }
+        isSuspendingRatingsSync = false
     }
 }

@@ -137,10 +137,21 @@ struct PhotoReviewView: View {
                 Text("\(viewModel.goodCount) good, \(viewModel.badCount) bad.\nDelete all bad photos and their associated files?")
             }
         }
-        .alert("Deletion Complete", isPresented: $viewModel.showDeletionResult) {
-            Button("OK", role: .cancel) {}
+        .alert(viewModel.resultAlertTitle, isPresented: $viewModel.showDeletionResult) {
+            if !viewModel.photos.isEmpty && !viewModel.hasJustRenamed {
+                Button("Rename Photos…") {
+                    viewModel.showRenameSheet = true
+                }
+            }
+            Button("Skip", role: .cancel) {}
         } message: {
             Text(viewModel.deletionResultMessage)
+        }
+        .sheet(isPresented: $viewModel.showRenameSheet) {
+            RenameSheetView(viewModel: viewModel)
+        }
+        .onChange(of: viewModel.showDeletionResult) { _, isShowing in
+            if !isShowing { viewModel.hasJustRenamed = false }
         }
     }
 }
