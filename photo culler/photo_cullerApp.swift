@@ -77,6 +77,11 @@ struct photo_cullerApp: App {
             CommandGroup(after: .toolbar) {
                 Divider()
                 Menu("Mode") {
+                    Button("Cycle Mode") {
+                        viewModel?.cycleViewMode()
+                    }
+                    .keyboardShortcut("m", modifiers: [.command, .shift])
+                    Divider()
                     Picker(
                         selection: Binding(
                             get: { viewModel?.viewMode ?? .allPhotos },

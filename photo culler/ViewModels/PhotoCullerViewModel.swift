@@ -219,6 +219,14 @@ class PhotoCullerViewModel {
         filteredViewIndex = 0
     }
 
+    func cycleViewMode() {
+        switch viewMode {
+        case .allPhotos:    setViewMode(.unratedOnly)
+        case .unratedOnly:  setViewMode(.rejectedOnly)
+        case .rejectedOnly: setViewMode(.allPhotos)
+        }
+    }
+
     func enterReviewRejectsMode() {
         setViewMode(.rejectedOnly)
     }
