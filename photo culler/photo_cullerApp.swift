@@ -68,6 +68,11 @@ struct photo_cullerApp: App {
                 }
                 .keyboardShortcut("d", modifiers: .command)
                 .disabled(!(viewModel?.hasLoadedFolder ?? false) || (viewModel?.badCount ?? 0) == 0)
+                Button("Rename Photos…") {
+                    viewModel?.showRenameSheet = true
+                }
+                .keyboardShortcut("r", modifiers: .command)
+                .disabled(!(viewModel?.hasLoadedFolder ?? false) || (viewModel?.photos.isEmpty ?? true) || (viewModel?.hasJustRenamed ?? false))
             }
             CommandGroup(after: .toolbar) {
                 Divider()

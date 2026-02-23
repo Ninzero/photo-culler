@@ -143,7 +143,7 @@ struct PhotoReviewView: View {
                     viewModel.showRenameSheet = true
                 }
             }
-            Button("Skip", role: .cancel) {}
+            Button(viewModel.hasJustRenamed ? "Done" : "Skip", role: .cancel) {}
         } message: {
             Text(viewModel.deletionResultMessage)
         }
