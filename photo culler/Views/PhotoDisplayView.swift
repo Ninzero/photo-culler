@@ -117,18 +117,21 @@ struct PhotoDisplayView: View {
         dragOffset = .zero
     }
 
-    // 使用 ImageIO 加载图片，对 RAW 文件直接读取内嵌 JPEG 预览，避免主线程阻塞
+    // 使用 ImageIO 加载图片：RAW 读内嵌 JPEG 预览（速度优先），HIF/JPG 强制从原始数据解码（清晰度优先）
     private nonisolated static func loadImage(from url: URL) -> NSImage? {
         guard let source = CGImageSourceCreateWithURL(url as CFURL, nil) else { return nil }
+
+        let ext = url.pathExtension.lowercased()
+        let rawExtensions: Set<String> = ["3fr","arw","cr2","cr3","dng","fff","nef","raf","raw","rwl"]
+
+        // RAW：读内嵌 JPEG 预览，速度优先；非 RAW：FromImageAlways 跳过内嵌预览，从原始数据解码全分辨率
         let options: [CFString: Any] = [
-            kCGImageSourceCreateThumbnailFromImageIfAbsent: true,
-            kCGImageSourceCreateThumbnailFromImageAlways: false,
+            kCGImageSourceCreateThumbnailFromImageIfAbsent: rawExtensions.contains(ext),
+            kCGImageSourceCreateThumbnailFromImageAlways: !rawExtensions.contains(ext),
             kCGImageSourceCreateThumbnailWithTransform: true,
-            kCGImageSourceThumbnailMaxPixelSize: 4096
+            kCGImageSourceThumbnailMaxPixelSize: 10000
         ]
-        guard let cgImage = CGImageSourceCreateThumbnailAtIndex(source, 0, options as CFDictionary) else {
-            return nil
-        }
+        guard let cgImage = CGImageSourceCreateThumbnailAtIndex(source, 0, options as CFDictionary) else { return nil }
         return NSImage(cgImage: cgImage, size: .zero)
     }
 }
