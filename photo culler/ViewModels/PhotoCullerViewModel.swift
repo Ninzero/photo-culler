@@ -5,6 +5,7 @@ enum ViewMode {
     case allPhotos
     case rejectedOnly
     case unratedOnly
+    case prizedOnly
 }
 
 @Observable
@@ -104,6 +105,10 @@ class PhotoCullerViewModel {
         photos.filter { $0.rating == .bad }
     }
 
+    var goodPhotos: [PhotoItem] {
+        photos.filter { $0.rating == .good }
+    }
+
     var unratedPhotos: [PhotoItem] {
         photos.filter { $0.rating == nil }
     }
@@ -113,6 +118,7 @@ class PhotoCullerViewModel {
         case .allPhotos:    return photos
         case .rejectedOnly: return badPhotos
         case .unratedOnly:  return unratedPhotos
+        case .prizedOnly:   return goodPhotos
         }
     }
 
@@ -130,6 +136,9 @@ class PhotoCullerViewModel {
         case .unratedOnly:
             guard filteredViewIndex >= 0, filteredViewIndex < unratedPhotos.count else { return nil }
             return unratedPhotos[filteredViewIndex]
+        case .prizedOnly:
+            guard filteredViewIndex >= 0, filteredViewIndex < goodPhotos.count else { return nil }
+            return goodPhotos[filteredViewIndex]
         }
     }
 
@@ -223,7 +232,8 @@ class PhotoCullerViewModel {
         switch viewMode {
         case .allPhotos:    setViewMode(.unratedOnly)
         case .unratedOnly:  setViewMode(.rejectedOnly)
-        case .rejectedOnly: setViewMode(.allPhotos)
+        case .rejectedOnly: setViewMode(.prizedOnly)
+        case .prizedOnly:   setViewMode(.allPhotos)
         }
     }
 

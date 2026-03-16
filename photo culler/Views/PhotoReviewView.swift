@@ -21,6 +21,12 @@ struct PhotoReviewView: View {
                             ? "Unrated Only — No unrated photos"
                             : "Unrated Only — \(viewModel.unratedPhotos.count) unrated photo(s)")
                             .font(.caption)
+                    case .prizedOnly:
+                        Image(systemName: "star.fill")
+                        Text(viewModel.goodPhotos.isEmpty
+                            ? "Prized Only — No prized photos"
+                            : "Prized Only — \(viewModel.goodPhotos.count) prized photo(s)")
+                            .font(.caption)
                     case .allPhotos:
                         EmptyView()
                     }
@@ -28,8 +34,20 @@ struct PhotoReviewView: View {
                 }
                 .padding(.horizontal, 12)
                 .padding(.vertical, 6)
-                .background(viewModel.viewMode == .rejectedOnly ? Color.orange.opacity(0.15) : Color.blue.opacity(0.15))
-                .foregroundStyle(viewModel.viewMode == .rejectedOnly ? AnyShapeStyle(.orange) : AnyShapeStyle(.blue))
+                .background({
+                    switch viewModel.viewMode {
+                    case .rejectedOnly: return Color.orange.opacity(0.15)
+                    case .prizedOnly:   return Color.green.opacity(0.15)
+                    default:            return Color.blue.opacity(0.15)
+                    }
+                }())
+                .foregroundStyle({
+                    switch viewModel.viewMode {
+                    case .rejectedOnly: return AnyShapeStyle(.orange)
+                    case .prizedOnly:   return AnyShapeStyle(.green)
+                    default:            return AnyShapeStyle(.blue)
+                    }
+                }())
             }
 
             ProgressBarView(
@@ -38,19 +56,28 @@ struct PhotoReviewView: View {
             )
 
             if (viewModel.viewMode == .rejectedOnly && viewModel.badPhotos.isEmpty) ||
-               (viewModel.viewMode == .unratedOnly && viewModel.unratedPhotos.isEmpty) {
+               (viewModel.viewMode == .unratedOnly && viewModel.unratedPhotos.isEmpty) ||
+               (viewModel.viewMode == .prizedOnly && viewModel.goodPhotos.isEmpty) {
                 VStack(spacing: 12) {
                     Image(systemName: "checkmark.seal.fill")
                         .font(.system(size: 48))
                         .foregroundStyle(.green)
-                    if viewModel.viewMode == .rejectedOnly {
+                    switch viewModel.viewMode {
+                    case .rejectedOnly:
                         Text("No Rejected Photos")
                             .font(.title2)
                             .fontWeight(.medium)
                         Text("All photos are rated Good or unrated.")
                             .font(.caption)
                             .foregroundStyle(.secondary)
-                    } else {
+                    case .prizedOnly:
+                        Text("No Prized Photos")
+                            .font(.title2)
+                            .fontWeight(.medium)
+                        Text("Rate some photos as Good to see them here.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    default:
                         Text("All Photos Rated")
                             .font(.title2)
                             .fontWeight(.medium)
@@ -80,6 +107,7 @@ struct PhotoReviewView: View {
                     case .allPhotos:    return viewModel.photoCount
                     case .rejectedOnly: return viewModel.badPhotos.count
                     case .unratedOnly:  return viewModel.unratedPhotos.count
+                    case .prizedOnly:   return viewModel.goodPhotos.count
                     }
                 }(),
                 currentRating: viewModel.displayedCurrentPhoto?.rating,

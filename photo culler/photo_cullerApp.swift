@@ -92,6 +92,7 @@ struct photo_cullerApp: App {
                         Text("All Photos").tag(ViewMode.allPhotos)
                         Text("Rejected Only").tag(ViewMode.rejectedOnly)
                         Text("Unrated Only").tag(ViewMode.unratedOnly)
+                        Text("Prized Only").tag(ViewMode.prizedOnly)
                     }
                     .pickerStyle(.inline)
                     .labelsHidden()
