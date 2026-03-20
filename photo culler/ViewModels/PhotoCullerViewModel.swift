@@ -17,6 +17,13 @@ class PhotoCullerViewModel {
     var showDeletionResult: Bool = false
     var deletionResultMessage: String = ""
     var showRenameSheet: Bool = false
+    var showCopySheet: Bool = false
+    var copyOverwrite: Bool = true
+    var isCopying: Bool = false
+    var copyProgress: Double = 0
+    var copyStatusText: String = ""
+    var showCopyResult: Bool = false
+    var copyResultMessage: String = ""
     var resultAlertTitle: String = "Deletion Complete"
     var hasJustRenamed: Bool = false
 
@@ -347,7 +354,7 @@ class PhotoCullerViewModel {
     }
 
     func confirmDeletion() {
-        guard let folderURL else { return }
+        guard let folderURL, !isCopying else { return }
 
         AuditLogger.log("DELETION_CONFIRMED: User confirmed deletion of \(badCount) bad photo(s)", in: folderURL)
 
@@ -388,8 +395,59 @@ class PhotoCullerViewModel {
         AuditLogger.log("DELETION_CANCELLED: User cancelled deletion", in: folderURL)
     }
 
+    func confirmCopy() {
+        guard let folderURL, !isCopying else { return }
+
+        let photosSnapshot = photos
+        let goodCount = photosSnapshot.filter { $0.rating == .good }.count
+        guard goodCount > 0 else {
+            showCopySheet = false
+            return
+        }
+
+        let destinationURL = folderURL.appendingPathComponent("Prized")
+        AuditLogger.log("COPY_CONFIRMED: User confirmed copy of \(goodCount) good photo(s) to \(destinationURL.path)", in: folderURL)
+
+        let overwrite = copyOverwrite
+        isCopying = true
+        copyProgress = 0
+        copyStatusText = "Preparing…"
+
+        Task { @MainActor in
+            let result = await Task.detached {
+                PhotoCopier.copyGoodPhotos(
+                    from: photosSnapshot,
+                    to: destinationURL,
+                    in: folderURL,
+                    overwrite: overwrite,
+                    onProgress: { completed, total in
+                        Task { @MainActor in
+                            self.copyProgress = total > 0 ? Double(completed) / Double(total) : 1.0
+                            self.copyStatusText = "Copying \(completed)/\(total) files…"
+                        }
+                    }
+                )
+            }.value
+
+            self.isCopying = false
+            self.showCopySheet = false
+
+            // Guard: if user switched folders during copy, discard stale results
+            guard self.folderURL == folderURL else { return }
+
+            self.copyResultMessage = result.summary
+            self.showCopyResult = true
+        }
+    }
+
+    func cancelCopy() {
+        guard let folderURL else { return }
+        showCopySheet = false
+        AuditLogger.log("COPY_CANCELLED: User cancelled copy", in: folderURL)
+    }
+
     func performRename(seriesName: String) {
-        guard let folderURL, !photos.isEmpty else { return }
+        guard let folderURL, !photos.isEmpty, !isCopying else { return }
         let photosSnapshot = photos
         let currentMode = matchingMode
         let trimmed = seriesName.trimmingCharacters(in: .whitespaces)

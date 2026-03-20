@@ -178,6 +178,14 @@ struct PhotoReviewView: View {
         .sheet(isPresented: $viewModel.showRenameSheet) {
             RenameSheetView(viewModel: viewModel)
         }
+        .sheet(isPresented: $viewModel.showCopySheet) {
+            CopyGoodPhotosSheet(viewModel: viewModel)
+        }
+        .alert("Copy Complete", isPresented: $viewModel.showCopyResult) {
+            Button("OK") { }
+        } message: {
+            Text(viewModel.copyResultMessage)
+        }
         .onChange(of: viewModel.showDeletionResult) { _, isShowing in
             if !isShowing { viewModel.hasJustRenamed = false }
         }

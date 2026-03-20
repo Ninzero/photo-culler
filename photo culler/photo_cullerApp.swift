@@ -49,6 +49,10 @@ struct photo_cullerApp: App {
     @State private var extensionSettings = ExtensionSettings()
     @FocusedValue(\.viewModel) private var viewModel
 
+    private var isCopyBusy: Bool {
+        (viewModel?.showCopySheet ?? false) || (viewModel?.isCopying ?? false)
+    }
+
     var body: some Scene {
         WindowGroup {
             ContentView()
@@ -61,18 +65,24 @@ struct photo_cullerApp: App {
                     openFolder()
                 }
                 .keyboardShortcut("o", modifiers: .command)
+                .disabled(isCopyBusy)
             }
             CommandMenu("Photo") {
                 Button("Delete Bad Photos…") {
                     viewModel?.showCompletionDialog = true
                 }
                 .keyboardShortcut("d", modifiers: .command)
-                .disabled(!(viewModel?.hasLoadedFolder ?? false) || (viewModel?.badCount ?? 0) == 0)
+                .disabled(!(viewModel?.hasLoadedFolder ?? false) || (viewModel?.badCount ?? 0) == 0 || isCopyBusy)
                 Button("Rename Photos…") {
                     viewModel?.showRenameSheet = true
                 }
                 .keyboardShortcut("r", modifiers: .command)
-                .disabled(!(viewModel?.hasLoadedFolder ?? false) || (viewModel?.photos.isEmpty ?? true) || (viewModel?.hasJustRenamed ?? false))
+                .disabled(!(viewModel?.hasLoadedFolder ?? false) || (viewModel?.photos.isEmpty ?? true) || (viewModel?.hasJustRenamed ?? false) || isCopyBusy)
+                Button("Copy Good Photos…") {
+                    viewModel?.showCopySheet = true
+                }
+                .keyboardShortcut("c", modifiers: [.command, .shift])
+                .disabled(!(viewModel?.hasLoadedFolder ?? false) || (viewModel?.goodCount ?? 0) == 0 || isCopyBusy)
             }
             CommandGroup(after: .toolbar) {
                 Divider()
