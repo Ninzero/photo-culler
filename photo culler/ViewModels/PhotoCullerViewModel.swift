@@ -18,6 +18,7 @@ class PhotoCullerViewModel {
     var deletionResultMessage: String = ""
     var showRenameSheet: Bool = false
     var showCopySheet: Bool = false
+    var copyDestinationPath: String = ""
     var copyOverwrite: Bool = true
     var isCopying: Bool = false
     var copyProgress: Double = 0
@@ -405,7 +406,7 @@ class PhotoCullerViewModel {
             return
         }
 
-        let destinationURL = folderURL.appendingPathComponent("Prized")
+        let destinationURL = URL(fileURLWithPath: copyDestinationPath)
         AuditLogger.log("COPY_CONFIRMED: User confirmed copy of \(goodCount) good photo(s) to \(destinationURL.path)", in: folderURL)
 
         let overwrite = copyOverwrite
@@ -444,6 +445,12 @@ class PhotoCullerViewModel {
         guard let folderURL else { return }
         showCopySheet = false
         AuditLogger.log("COPY_CANCELLED: User cancelled copy", in: folderURL)
+    }
+
+    func openCopySheet() {
+        guard let folderURL else { return }
+        copyDestinationPath = folderURL.appendingPathComponent("prized").path
+        showCopySheet = true
     }
 
     func performRename(seriesName: String) {

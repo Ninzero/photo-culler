@@ -79,7 +79,7 @@ struct photo_cullerApp: App {
                 .keyboardShortcut("r", modifiers: .command)
                 .disabled(!(viewModel?.hasLoadedFolder ?? false) || (viewModel?.photos.isEmpty ?? true) || (viewModel?.hasJustRenamed ?? false) || isCopyBusy)
                 Button("Copy Good Photos…") {
-                    viewModel?.showCopySheet = true
+                    viewModel?.openCopySheet()
                 }
                 .keyboardShortcut("c", modifiers: [.command, .shift])
                 .disabled(!(viewModel?.hasLoadedFolder ?? false) || (viewModel?.goodCount ?? 0) == 0 || isCopyBusy)
