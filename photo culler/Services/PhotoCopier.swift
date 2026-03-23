@@ -22,7 +22,7 @@ struct CopyResult {
 }
 
 struct PhotoCopier {
-    static func copyGoodPhotos(
+    nonisolated static func copyGoodPhotos(
         from photos: [PhotoItem],
         to destinationURL: URL,
         in folderURL: URL,

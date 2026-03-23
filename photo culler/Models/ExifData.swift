@@ -1,7 +1,7 @@
 // photo culler/Models/ExifData.swift
 import Foundation
 
-struct ExifData {
+struct ExifData: Sendable {
     // Exposure
     var aperture: String?         // "f/2.8"
     var shutterSpeed: String?     // "1/500s"
@@ -31,6 +31,8 @@ struct ExifData {
     var latitude: Double?
     var longitude: Double?
     var altitude: Double?         // meters
+
+    nonisolated init() {}
 
     var coordinateString: String? {
         guard let lat = latitude, let lon = longitude else { return nil }

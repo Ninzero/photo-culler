@@ -1,15 +1,15 @@
 import Foundation
 
 struct AuditLogger {
-    static func log(_ message: String, in folderURL: URL) {
+    nonisolated static func log(_ message: String, in folderURL: URL) {
         log(message, folderName: folderURL.lastPathComponent)
     }
 
-    static func log(_ message: String) {
+    nonisolated static func log(_ message: String) {
         log(message, folderName: "global")
     }
 
-    private static func log(_ message: String, folderName: String) {
+    nonisolated private static func log(_ message: String, folderName: String) {
         guard let url = logURL() else { return }
         let dir = url.deletingLastPathComponent()
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
@@ -29,7 +29,7 @@ struct AuditLogger {
         }
     }
 
-    private static func logURL() -> URL? {
+    nonisolated private static func logURL() -> URL? {
         guard let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first else { return nil }
         return appSupport
             .appendingPathComponent("com.ninzero.photo-culler")
