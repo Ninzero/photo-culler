@@ -29,6 +29,9 @@ class PhotoCullerViewModel {
     var hasJustRenamed: Bool = false
 
     var isLoadingFolder = false
+    var currentPhotoExif: ExifData? = nil
+    var isLoadingExif: Bool = false
+    private var exifLoadTask: Task<Void, Never>? = nil
     private(set) var matchingMode: MatchingMode = .hash
 
     var viewMode: ViewMode = .allPhotos
@@ -156,6 +159,26 @@ class PhotoCullerViewModel {
 
     var displayedCanGoPrevious: Bool {
         viewMode == .allPhotos ? canGoPrevious : filteredViewIndex > 0
+    }
+
+    func loadExifForCurrentPhoto() {
+        exifLoadTask?.cancel()
+        currentPhotoExif = nil
+        isLoadingExif = true
+        let url = displayedCurrentPhoto?.displayURL
+        exifLoadTask = Task { @MainActor in
+            guard let url, !Task.isCancelled else {
+                isLoadingExif = false
+                return
+            }
+            let result = await ExifReader.shared.exif(for: url)
+            guard !Task.isCancelled else {
+                isLoadingExif = false
+                return
+            }
+            currentPhotoExif = result
+            isLoadingExif = false
+        }
     }
 
     func loadFolder(

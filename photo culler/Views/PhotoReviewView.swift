@@ -3,6 +3,7 @@ import SwiftUI
 struct PhotoReviewView: View {
     @Bindable var viewModel: PhotoCullerViewModel
     @State private var showThumbnails = false
+    @State private var showExif = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -118,6 +119,30 @@ struct PhotoReviewView: View {
                 onRate: { rating in viewModel.rateCurrent(rating) }
             )
         }
+        .overlay(alignment: .leading) {
+            HStack(spacing: 0) {
+                if showExif {
+                    ExifPanelView(
+                        isLoading: viewModel.isLoadingExif,
+                        exif: viewModel.currentPhotoExif
+                    )
+                    .transition(.move(edge: .leading).combined(with: .opacity))
+                    Divider()
+                }
+
+                Color.clear
+                    .frame(width: 20)
+                    .contentShape(Rectangle())
+            }
+            .onContinuousHover { phase in
+                switch phase {
+                case .active:
+                    withAnimation(.easeInOut(duration: 0.2)) { showExif = true }
+                case .ended:
+                    withAnimation(.easeInOut(duration: 0.25)) { showExif = false }
+                }
+            }
+        }
         .overlay(alignment: .trailing) {
             // 热区（20pt）+ 缩略图面板共用一个 onContinuousHover，
             // 鼠标进入任意部分就显示，完全离开才隐藏
@@ -185,6 +210,12 @@ struct PhotoReviewView: View {
             Button("OK") { }
         } message: {
             Text(viewModel.copyResultMessage)
+        }
+        .onChange(of: viewModel.displayedCurrentPhoto?.displayURL) { _, _ in
+            viewModel.loadExifForCurrentPhoto()
+        }
+        .onAppear {
+            viewModel.loadExifForCurrentPhoto()
         }
         .onChange(of: viewModel.showDeletionResult) { _, isShowing in
             if !isShowing { viewModel.hasJustRenamed = false }
