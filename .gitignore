@@ -153,3 +153,10 @@ iOSInjectionProject/
 # End of https://www.toptal.com/developers/gitignore/api/macos,swift,xcode,visualstudiocode
 
 data/
+
+# Agents
+.agents
+.claude
+.codex
+
+openspec/changes/*

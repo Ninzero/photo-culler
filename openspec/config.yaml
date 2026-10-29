@@ -1,0 +1,30 @@
+schema: spec-driven
+
+# Project context (optional)
+# Add only constraints that should guide OpenSpec artifacts and workflows.
+# Include constraints an agent cannot infer by reading the code.
+# Keep general project documentation and discoverable codebase facts out.
+context: |
+  语言：中文（简体）
+  必须使用简体中文撰写产出物。保持英文的例外场景：
+  - 技术术语，例如 "API", "REST", "TypeScript" 等
+  - 代码片段､ 标识符､ 命令､ 文件路径等
+  - OpenSpec 的模板标题､ Requirement/Scenario 标记､ SHALL/MUST､ WHEN/THEN､ 变更操作标题等
+
+# Per-artifact rules (optional)
+# Add custom rules for specific artifacts.
+rules:
+  tasks:
+    - 总是在最后添加明确的用户验收步骤, 仅在用户确认验收通过后, 才能标记为完成
+
+# Per-operation guidance (optional)
+# Add advisory guidance for how apply and archive work should be conducted.
+# This is separate from artifact rules above.
+# Example:
+#   operations:
+#     apply:
+#       guidance:
+#         - Keep test summaries concise
+#     archive:
+#       guidance:
+#         - Summarize the archive outcome before finishing
