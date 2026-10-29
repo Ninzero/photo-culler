@@ -29,7 +29,7 @@
 - **THEN** 系统提示允许的字符，改名操作不可执行
 
 ### Requirement: 命名格式
-改名后每张照片的 basename SHALL 为 `<系列名>-<序号>`。序号从 1 开始，按当前照片列表的顺序依次分配，并补零到至少 3 位；照片总数的位数超过 3 位时，所有序号补零到与总数相同的位数。每个文件 SHALL 保留原扩展名，同一张照片的 RAW 与输出文件 SHALL 获得相同的 basename。执行前系统 SHALL 预览第一个与最后一个名称。
+改名后每张照片的 basename SHALL 为 `<系列名>-<序号>`。序号从 1 开始，按当前照片列表的顺序依次分配，并补零到至少 3 位；照片总数的位数超过 3 位时，所有序号补零到与总数相同的位数。每个文件 SHALL 保留原扩展名，同一张照片的全部 RAW 与输出文件 SHALL 获得相同的 basename。执行前系统 SHALL 预览第一个与最后一个名称。
 
 #### Scenario: 常规编号
 - **WHEN** 文件夹有 42 张照片，系列名为 `Wedding`
@@ -42,6 +42,10 @@
 #### Scenario: RAW 与输出文件同步改名
 - **WHEN** 第 1 张照片有 `DSC00001.ARW` 与 `DSC00001.HIF`，系列名为 `Wedding`
 - **THEN** 两个文件分别被命名为 `Wedding-001.ARW` 与 `Wedding-001.HIF`
+
+#### Scenario: 多个 RAW 与输出文件同步改名
+- **WHEN** 第 1 张照片有 `DSC00001.ARW`、`DSC00001.DNG`、`DSC00001.HIF` 与 `DSC00001.JPG`，系列名为 `Wedding`
+- **THEN** 四个文件分别被命名为 `Wedding-001.ARW`、`Wedding-001.DNG`、`Wedding-001.HIF` 与 `Wedding-001.JPG`
 
 ### Requirement: 外部冲突时整体中止
 如果任何目标文件名已被不属于本次改名批次的文件占用，系统 SHALL 不改名任何文件，并汇报每个冲突。
