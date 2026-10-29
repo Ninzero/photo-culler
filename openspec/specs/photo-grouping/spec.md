@@ -57,3 +57,33 @@
 #### Scenario: 仅有 RAW
 - **WHEN** 当前照片只有 `.ARW` 文件
 - **THEN** 主视图显示该 RAW 文件的预览图
+
+### Requirement: 照片列表按 basename 自然顺序排列
+系统 SHALL 按照片 basename 的自然顺序排列照片列表：basename 中的连续数字 SHALL 按数值大小比较，字母 SHALL 不区分大小写比较。
+
+#### Scenario: 未补零的编号
+- **WHEN** 文件夹中存在 `IMG_1`、`IMG_2`、`IMG_10` 三张照片
+- **THEN** 照片列表顺序为 `IMG_1`、`IMG_2`、`IMG_10`
+
+#### Scenario: 大小写不同
+- **WHEN** 文件夹中存在 `img_01` 与 `IMG_02` 两张照片
+- **THEN** `img_01` 排在 `IMG_02` 之前
+
+#### Scenario: 已补零的编号
+- **WHEN** 文件夹中存在 `DSC09999` 与 `DSC10000` 两张照片
+- **THEN** `DSC09999` 排在 `DSC10000` 之前
+
+### Requirement: 照片列表顺序确定
+对同一组文件，系统 SHALL 每次加载都给出完全相同的照片列表顺序，basename 只差大小写或只差数字补零位数的照片也不例外。
+
+#### Scenario: 重复打开同一文件夹
+- **WHEN** 用户多次打开同一文件夹，期间文件没有变化
+- **THEN** 每次的照片列表顺序都相同
+
+#### Scenario: basename 只差大小写
+- **WHEN** 文件夹中存在 `IMG_0001.ARW` 与 `img_0001.JPG`，它们被识别为两张照片
+- **THEN** 两张照片在列表中的先后顺序每次加载都相同
+
+#### Scenario: basename 只差补零位数
+- **WHEN** 文件夹中存在 `photo-2` 与 `photo-02` 两张照片
+- **THEN** 两张照片在列表中的先后顺序每次加载都相同
