@@ -4,58 +4,48 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Photo Culler — macOS SwiftUI 桌面应用，用于摄影师快速筛选 RAW 照片。用户选择文件夹后逐张浏览照片并评价（合格/糟糕），完成后可批量删除糟糕照片（含 RAW 和输出格式）。
+Photo Culler — macOS SwiftUI 桌面应用，供摄影师快速筛选 RAW 照片：选择文件夹后逐张评价（合格 / 糟糕），再对结果批量删除、改名或复制。
+
+## Specs: OpenSpec 是行为的权威来源
+
+- 产品行为、交互细节与不变量以 `openspec/specs/<capability>/spec.md` 为准。本文件只描述代码结构；两者冲突时以 spec 为准，并修正本文件。
+- 修改用户可见行为时走 OpenSpec 流程（`openspec-*` skills），产出物使用简体中文（见 `openspec/config.yaml`）。
+- `openspec/changes/` 被 `.gitignore` 忽略，只有 `openspec/specs/` 入库。
 
 ## Build & Run
 
-Xcode 项目，无外部依赖，仅使用 Foundation / SwiftUI / AppKit / Observation 框架。
-
 ```bash
-# 命令行构建
 xcodebuild -project "photo culler.xcodeproj" -scheme "photo culler" -destination 'platform=macOS,arch=arm64' build
-
-# 或在 Xcode 中: Cmd+B 构建, Cmd+R 运行, Cmd+U 测试
 ```
 
-部署目标: macOS 15.7+（使用 `@Observable` 宏）。
+- 需要 Xcode 26+（用到 Swift 6.2 的默认隔离设置）。单一 target，无外部依赖，无测试 target：改动靠构建 + 手动运行验证。
+- 部署目标 macOS 14.0；启用 App Sandbox（用户所选文件读写权限）。
+- `SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor` + Approachable Concurrency：类型默认隔离在 MainActor，需要离开主线程的代码（文件 I/O、哈希、EXIF 解析、审计日志）必须显式 `nonisolated`、放进 `actor`，或用 `Task.detached` 执行。
 
 ## Architecture
 
-MVVM 架构，所有源码在 `photo culler/` 目录下：
+MVVM，源码在 `photo culler/`：
 
-- **`photo_cullerApp.swift`** — App 入口；`AppDelegate` 实现最后窗口关闭时退出 App；App 级别创建 `ExtensionSettings`（`@State`）并通过 `.environment()` 注入；使用 `ViewModelFocusedKey`（`@FocusedValue`）让菜单命令访问当前窗口的 ViewModel；菜单含 **File > Open…**（Cmd+O）和 **Photo > Delete Bad Photos…**（Cmd+D）
-- **Models/** — `PhotoItem`（照片数据模型，按 basename 聚合 RAW + 输出文件；含运行时填充的 `fileHashes: [String]` 字段（哈希模式下为各关联文件前 4 MB SHA-256 hex，路径模式下保持空 `[]`）；含 `pathKey` 计算属性，返回 `(rawURL ?? outputURL)?.deletingPathExtension().path ?? id`，即去扩展名的绝对路径，为路径模式下的存储 key）、`Rating`（`.good` / `.bad` 枚举，Codable）、`ExtensionSettings`（`@Observable` class，管理可配置的 RAW/输出扩展名及 `matchingMode: MatchingMode`，均持久化至 `UserDefaults`）、`MatchingMode`（`enum`，定义于 `ExtensionSettings.swift`；`.hash` = 按文件内容 SHA-256 存储评价（默认，抗路径变动）；`.path` = 按文件绝对路径存储（跳过哈希计算，加载更快，但路径变动后评价失效））
-- **ViewModels/** — `PhotoCullerViewModel`（`@Observable`，管理照片列表、当前索引、评价、删除流程等全部业务状态；含 `showDeletionResult` / `deletionResultMessage` 属性驱动删除完成提示；含 `isLoadingFolder` 属性驱动加载 spinner；含 `matchingMode: MatchingMode` 属性，在 `loadFolder()` 开头锁定，会话期间不受 Settings 改变影响；`loadFolder()` 为 `async`，哈希模式下用 `withTaskGroup` 并发计算哈希，路径模式下跳过哈希计算；在 `init` 中订阅 `NotificationCenter` 的 `.ratingsDidChange` 通知，收到时调用 `syncRatingsFromStore(changedKeys:)` 精准更新本窗口 `photos` 中受影响照片的 rating，实现多窗口实时同步）
-- **Views/** — `ContentView`（根视图，内部用 `@State` 创建 `PhotoCullerViewModel`，通过 `.environment()` + `.focusedSceneValue()` 双重注入；三态切换：加载中显示 spinner / 已加载显示审阅视图 / 未加载显示文件夹选择）、`PhotoReviewView`（含两个 alert：全部评价完成 + 删除完成）、`PhotoDisplayView`（图片显示，支持捏合/滚轮缩放 1x–20x、双击缩放到 2.5x/复位、拖动平移；使用 `NSViewRepresentable` + ImageIO 提取 RAW 缩略图）、`BottomControlBar`、`ProgressBarView`、`FolderSelectionView`、`ThumbnailStripView`（右侧悬停展开的缩略图条，显示全部照片及评价徽章，点击跳转）、`SettingsView`（RAW/输出扩展名设置窗口）、`ExtensionListEditor`（扩展名列表编辑组件）
-- **Services/** — `PhotoScanner`（扫描文件夹，按 basename 分组 RAW/输出文件；结果按 basename 自然顺序排序，用 `localizedStandardCompare`（同 Finder：数字按数值比较、不区分大小写），比较相等时以码点顺序兜底，保证顺序确定）、`FileHasher`（`actor`，单例 `shared`；`hash(for:)` 为 `async`，缓存命中在 actor 上快速返回，缓存未命中通过 `Task.detached` 并发执行文件 I/O；`computeHash` 为 `nonisolated static` 可在任意线程调用；`persistCache()` 快照后在 background detached task 中异步写盘；磁盘缓存路径 `~/Library/Caches/com.ninzero.photo-culler/hash_cache.json`）、`RatingStore`（`@MainActor @Observable final class`，单例 `shared`；app 启动时从磁盘加载一次，`ratings: [String: Rating]` 为进程内唯一真相；key 可为 64 位 hex（哈希模式）或以 `/` 开头的绝对路径去扩展名（路径模式），两者天然不冲突，共存于同一 JSON；`applyRating(_:forKeys:)` 更新内存 + post `.ratingsDidChange`（userInfo 携带 `changedKeys: Set<String>`）+ `Task.detached` 异步写盘；`currentFolderKeys: Set<String>` 记录当前文件夹所有照片的 key；`clearAll()` 同理；磁盘路径 `~/Library/Application Support/com.ninzero.photo-culler/ratings.json`）、`AuditLogger`（全局审计日志至 `~/Library/Application Support/com.ninzero.photo-culler/audit.log`，每条含文件夹名）、`PhotoDeleter`（安全删除 + 审计，返回 `DeletionResult`）
+- `photo_cullerApp.swift` — App 入口；所有菜单命令、快捷键及其可用性判断都集中在这里。菜单通过 `@FocusedValue(\.viewModel)` 拿到当前 key window 的 ViewModel；App 级的 `ExtensionSettings` 经 `.environment()` 注入。
+- `ContentView.swift` — 每个窗口的根视图，用 `@State` 持有本窗口的 `PhotoCullerViewModel`，并同时以 `.environment()` 和 `.focusedSceneValue()` 暴露。窗口成为 key 时把本窗口照片的 key 同步到 `RatingStore`（供「清除当前文件夹评价」使用）。
+- `Models/` — `PhotoItem`（一张照片 = 同 basename 的 RAW + 输出文件，外加运行时的评价与哈希）、`Rating`、`ExifData`；`ExtensionSettings`（`@Observable`，用户设置持久化到 `UserDefaults`，`MatchingMode` 也定义在这里）。
+- `ViewModels/PhotoCullerViewModel.swift` — 单个窗口的全部业务状态和流程编排：加载文件夹、导航、查看模式（`ViewMode`）、评价，以及删除 / 改名 / 复制的触发和结果展示。
+- `Services/` — 不含 UI，由 ViewModel 调用：
+  - `PhotoScanner` — 扫描文件夹，分组并排序为 `[PhotoItem]`
+  - `FileHasher` — `actor`，Hash 模式下计算文件哈希，带磁盘缓存
+  - `RatingStore` — `@MainActor` 单例，评价的持久化与跨窗口通知
+  - `PhotoDeleter` / `PhotoRenamer` / `PhotoCopier` — 文件变更操作，各自返回 `*Result`（含 `summary`）
+  - `ExifReader` — `actor`，读取 EXIF，带 LRU 缓存
+  - `AuditLogger` — 追加写审计日志
+- `Views/` — SwiftUI 视图，读取 ViewModel 状态并回调其方法。`PhotoReviewView` 是审阅主界面，承载各 alert / sheet 以及左侧 EXIF、右侧缩略图两个悬停面板。
 
-## Key Data Flow
+## Structural Conventions
 
-1. 用户通过 `NSOpenPanel` 选择文件夹
-2. `PhotoScanner` 按 basename 将 `.ARW/.DNG/.RAW` 和 `.JPG/.JPEG/.HIF` 分组为 `PhotoItem`，并按 basename 自然顺序排序（`IMG_2` 在 `IMG_10` 之前，`img_01` 在 `IMG_02` 之前）；该顺序决定导航、缩略图条和批量改名编号的顺序
-3. `loadFolder()` 锁定 `matchingMode`（来自 `ExtensionSettings`）；**哈希模式**下用 `withTaskGroup` 并发调用 `FileHasher.shared.hash(for:)` 计算文件哈希，**路径模式**下跳过哈希计算（`fileHashes` 保持空 `[]`）；加载期间 `isLoadingFolder = true`，ContentView 显示 spinner
-4. （哈希模式）`FileHasher`（actor）对每个请求：缓存命中直接返回，缓存未命中通过 `Task.detached` 在 cooperative thread pool 上并发读取文件前 4 MB 并计算 SHA-256
-5. 全部加载完成后，按当前模式的 key（hash 或 pathKey）从 `RatingStore.shared.ratings` 恢复已有评价
-6. ViewModel 跳转到第一张未评价照片
-7. 评价后自动保存 JSON + 写审计日志 + 自动跳转下一张未评价照片
-8. 确认删除弹窗可通过两种方式触发：
-   - 自动：全部照片评价完成后自动弹出
-   - 手动：菜单栏 **Photo → Delete Bad Photos…**（有 Bad 照片时可用）
-
-## Conventions
-
-- 持久化路径：
-  - 用户评价（不可丢失）：`~/Library/Application Support/com.ninzero.photo-culler/ratings.json`（key = 64 位 hex SHA-256（哈希模式）或去扩展名绝对路径（路径模式），两者共存于同一文件，天然不冲突）
-  - 审计日志：`~/Library/Application Support/com.ninzero.photo-culler/audit.log`（每条含文件夹名前缀）
-  - 哈希缓存（可重建）：`~/Library/Caches/com.ninzero.photo-culler/hash_cache.json`
-- **匹配模式**（`MatchingMode`）：用户可在 Settings 切换，切换后下次打开文件夹时生效（与扩展名设置一致）
-  - **Hash 模式**（默认）：`PhotoItem.fileHashes` 由 `FileHasher` 并发填充（RAW + 输出文件各自前 4 MB SHA-256），评价以任意一个 hash 为全局唯一键（写入时同时写入所有 hash），文件夹移动/重命名、或删除 RAW 只保留输出文件后评价依然有效
-  - **Path 模式**：以 `(rawURL ?? outputURL)?.deletingPathExtension().path`（即 `PhotoItem.pathKey`）为 key，跳过哈希计算，加载更快，但路径变动后评价失效
-- 显示照片时优先使用输出格式（HIF/JPG），其次 RAW
-- 键盘快捷键：左右箭头导航，上箭头=合格，下箭头=糟糕
-- 菜单快捷键：Cmd+O 打开文件夹，Cmd+D 触发删除确认
-- 菜单栏：**Photo → Delete Bad Photos…** 可在任意时刻触发删除确认（未加载文件夹或无 Bad 照片时禁用）
-- 所有删除操作必须有审计日志记录
-- RAW 扩展名（默认）: `.3fr`, `.arw`, `.cr2`, `.cr3`, `.dng`, `.fff`, `.nef`, `.raf`, `.raw`, `.rwl`；输出扩展名: `.jpg`, `.jpeg`, `.hif`
-- RAW/输出扩展名用户可在 **Settings** 窗口自定义，持久化至 `UserDefaults`（`rawExtensions` / `outputExtensions` key）
-- 匹配模式用户可在 **Settings** 窗口切换（`matchingMode` key），默认为 Hash 模式
+- **评价的唯一真相是 `RatingStore.shared.ratings`**，`PhotoItem.rating` 只是各窗口的缓存。写评价一律调用 `RatingStore.applyRating(_:forKeys:)`：它会 post `.ratingsDidChange`（`userInfo["changedKeys"]`），每个 ViewModel 收到后只刷新受影响的照片。
+- **评价 key 由加载文件夹时锁定的 `matchingMode` 决定**：Hash 模式用 `PhotoItem.fileHashes`，Path 模式用 `PhotoItem.pathKey`。读、写、清除评价都必须按同一模式取 key（ViewModel 与 `ContentView` 中有多处这样的分支）。改变文件路径的操作在 Path 模式下要迁移 key（参见 `performRename`）。
+- **文件变更操作放在 `Services/`**：逐文件处理，单个文件失败不中断，每一步都写审计日志，最后返回汇总结果。新增此类操作时沿用同样的模式。
+- 耗时操作不阻塞主线程：哈希并发计算（`withTaskGroup` + `FileHasher`），复制在 `Task.detached` 中执行，并用 `isCopying` 阻止其他文件操作。
+- 持久化文件位于 Application Support / Caches 下的 `com.ninzero.photo-culler/` 子目录（沙盒构建下实际在 `~/Library/Containers/com.ninzero.photo-culler/Data/Library/…`）：
+  - `ratings.json` — 用户评价，不可丢失；hash key 与 path key 共存于同一文件
+  - `audit.log` — 只追加
+  - `hash_cache.json`（Caches）— 可重建
