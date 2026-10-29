@@ -26,6 +26,11 @@ struct PhotoScanner {
             }
         }
 
-        return grouped.values.sorted { $0.id < $1.id }
+        // Finder-style natural order; ties fall back to code-point order so the result
+        // never depends on dictionary iteration order.
+        return grouped.values.sorted {
+            let order = $0.id.localizedStandardCompare($1.id)
+            return order == .orderedSame ? $0.id < $1.id : order == .orderedAscending
+        }
     }
 }
