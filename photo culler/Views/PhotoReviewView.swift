@@ -93,7 +93,12 @@ struct PhotoReviewView: View {
             }
 
             if let photo = viewModel.displayedCurrentPhoto {
-                Text(photo.displayURL?.lastPathComponent ?? photo.id)
+                let name = photo.displayURL?.lastPathComponent ?? photo.id
+                // With several files, list every extension so a mis-grouped photo is noticeable
+                let extensions = photo.fileURLs.count > 1
+                    ? " · " + photo.fileURLs.map(\.pathExtension).joined(separator: " / ")
+                    : ""
+                Text(name + extensions)
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .padding(.bottom, 4)

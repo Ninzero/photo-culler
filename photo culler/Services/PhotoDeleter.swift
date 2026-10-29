@@ -25,8 +25,7 @@ struct PhotoDeleter {
         let fileManager = FileManager.default
 
         for photo in badPhotos {
-            let urls = [photo.rawURL, photo.outputURL].compactMap { $0 }
-            for url in urls {
+            for url in photo.fileURLs {
                 let fileName = url.lastPathComponent
                 do {
                     try fileManager.removeItem(at: url)

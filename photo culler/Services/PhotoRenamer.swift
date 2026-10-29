@@ -53,13 +53,13 @@ struct PhotoRenamer {
         // 收集所有源文件 URL（用于冲突检测）
         var sourceURLSet: Set<URL> = []
         for photo in photos {
-            if let u = photo.rawURL    { sourceURLSet.insert(u.standardized) }
-            if let u = photo.outputURL { sourceURLSet.insert(u.standardized) }
+            for u in photo.fileURLs { sourceURLSet.insert(u.standardized) }
         }
 
         struct RenameOp {
             let photoIndex: Int
             let isRaw: Bool
+            let fileIndex: Int  // rawURLs / outputURLs 中的位置
             let sourceURL: URL
             let tempURL: URL
             let targetURL: URL
@@ -72,12 +72,11 @@ struct PhotoRenamer {
             let padded = String(format: "%0\(digitWidth)d", i + 1)
             let targetBasename = "\(seriesName)-\(padded)"
 
-            let pairs: [(URL, Bool)] = [
-                photo.rawURL.map    { ($0, true)  },
-                photo.outputURL.map { ($0, false) }
-            ].compactMap { $0 }
+            let files: [(URL, Bool, Int)] =
+                photo.rawURLs.enumerated().map    { ($1, true,  $0) } +
+                photo.outputURLs.enumerated().map { ($1, false, $0) }
 
-            for (sourceURL, isRaw) in pairs {
+            for (sourceURL, isRaw, fileIndex) in files {
                 let ext = sourceURL.pathExtension
                 let targetURL = folderURL.appendingPathComponent("\(targetBasename).\(ext)")
 
@@ -105,10 +104,10 @@ struct PhotoRenamer {
 
                 let suffix = isRaw ? "r" : "o"
                 let tempURL = folderURL.appendingPathComponent(
-                    ".tmp_rnm_\(sessionID)_\(i)_\(suffix).\(ext)"
+                    ".tmp_rnm_\(sessionID)_\(i)_\(suffix)\(fileIndex).\(ext)"
                 )
                 ops.append(RenameOp(
-                    photoIndex: i, isRaw: isRaw,
+                    photoIndex: i, isRaw: isRaw, fileIndex: fileIndex,
                     sourceURL: sourceURL, tempURL: tempURL, targetURL: targetURL
                 ))
             }
@@ -136,10 +135,9 @@ struct PhotoRenamer {
             }
         }
 
-        // 阶段二：临时名 → 最终目标名
+        // 阶段二：临时名 → 最终目标名，成功的文件在 photos 副本中原位替换为新 URL
         var renamedFileCount = 0
-        var newRawURLs: [Int: URL] = [:]
-        var newOutputURLs: [Int: URL] = [:]
+        var renamedPhotos = photos
 
         for op in phase1Success {
             do {
@@ -150,9 +148,9 @@ struct PhotoRenamer {
                     in: folderURL
                 )
                 if op.isRaw {
-                    newRawURLs[op.photoIndex] = op.targetURL
+                    renamedPhotos[op.photoIndex].rawURLs[op.fileIndex] = op.targetURL
                 } else {
-                    newOutputURLs[op.photoIndex] = op.targetURL
+                    renamedPhotos[op.photoIndex].outputURLs[op.fileIndex] = op.targetURL
                 }
             } catch {
                 failedFiles.append((op.tempURL.lastPathComponent, error))
@@ -161,13 +159,6 @@ struct PhotoRenamer {
                     in: folderURL
                 )
             }
-        }
-
-        // 用新 URL 构建更新后的 photos 数组
-        var renamedPhotos = photos
-        for i in renamedPhotos.indices {
-            if let url = newRawURLs[i]    { renamedPhotos[i].rawURL    = url }
-            if let url = newOutputURLs[i] { renamedPhotos[i].outputURL = url }
         }
 
         AuditLogger.log(

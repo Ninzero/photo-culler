@@ -28,7 +28,7 @@ MVVM，源码在 `photo culler/`：
 
 - `photo_cullerApp.swift` — App 入口；所有菜单命令、快捷键及其可用性判断都集中在这里。菜单通过 `@FocusedValue(\.viewModel)` 拿到当前 key window 的 ViewModel；App 级的 `ExtensionSettings` 经 `.environment()` 注入。
 - `ContentView.swift` — 每个窗口的根视图，用 `@State` 持有本窗口的 `PhotoCullerViewModel`，并同时以 `.environment()` 和 `.focusedSceneValue()` 暴露。窗口成为 key 时把本窗口照片的 key 同步到 `RatingStore`（供「清除当前文件夹评价」使用）。
-- `Models/` — `PhotoItem`（一张照片 = 同 basename 的 RAW + 输出文件，外加运行时的评价与哈希）、`Rating`、`ExifData`；`ExtensionSettings`（`@Observable`，用户设置持久化到 `UserDefaults`，`MatchingMode` 也定义在这里）。
+- `Models/` — `PhotoItem`（一张照片 = 同 basename 的全部 RAW 与输出文件，按 `fileURLs` 统一访问；外加运行时的评价与哈希）、`Rating`、`ExifData`；`ExtensionSettings`（`@Observable`，用户设置持久化到 `UserDefaults`，`MatchingMode` 也定义在这里）。
 - `ViewModels/PhotoCullerViewModel.swift` — 单个窗口的全部业务状态和流程编排：加载文件夹、导航、查看模式（`ViewMode`）、评价，以及删除 / 改名 / 复制的触发和结果展示。
 - `Services/` — 不含 UI，由 ViewModel 调用：
   - `PhotoScanner` — 扫描文件夹，分组并排序为 `[PhotoItem]`

@@ -31,7 +31,7 @@ struct PhotoCopier {
     ) -> CopyResult {
         let goodPhotos = photos.filter { $0.rating == .good }
         let allURLs: [(URL, String)] = goodPhotos.flatMap { photo in
-            [photo.rawURL, photo.outputURL].compactMap { $0 }.map { ($0, $0.lastPathComponent) }
+            photo.fileURLs.map { ($0, $0.lastPathComponent) }
         }
         let totalFiles = allURLs.count
 

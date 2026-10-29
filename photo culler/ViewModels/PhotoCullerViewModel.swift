@@ -68,10 +68,11 @@ class PhotoCullerViewModel {
             return
         }
         for i in photos.indices {
-            let photoKeys: Set<String> = matchingMode == .path
-                ? [photos[i].pathKey] : Set(photos[i].fileHashes)
+            // Keep fileHashes order (same as loadFolder) so the first stored rating wins deterministically
+            let photoKeys: [String] = matchingMode == .path
+                ? [photos[i].pathKey] : photos[i].fileHashes
             guard photoKeys.contains(where: { changedKeys.contains($0) }) else { continue }
-            photos[i].rating = photoKeys.compactMap { RatingStore.shared.ratings[$0] }.first
+            photos[i].rating = photoKeys.lazy.compactMap { RatingStore.shared.ratings[$0] }.first
         }
     }
 
@@ -195,16 +196,16 @@ class PhotoCullerViewModel {
 
             var finalPhotos = scannedPhotos
             if matchingMode == .hash {
-                // Compute file hashes concurrently using withTaskGroup (both RAW and output)
+                // Compute file hashes concurrently using withTaskGroup (every file, in fileURLs order)
                 var hashResults = [(Int, [String])](repeating: (0, []), count: scannedPhotos.count)
                 await withTaskGroup(of: (Int, [String]).self) { group in
                     for i in scannedPhotos.indices {
-                        let rawURL = scannedPhotos[i].rawURL
-                        let outputURL = scannedPhotos[i].outputURL
+                        let fileURLs = scannedPhotos[i].fileURLs
                         group.addTask {
                             var hashes: [String] = []
-                            if let url = rawURL, let h = await FileHasher.shared.hash(for: url) { hashes.append(h) }
-                            if let url = outputURL, let h = await FileHasher.shared.hash(for: url) { hashes.append(h) }
+                            for url in fileURLs {
+                                if let h = await FileHasher.shared.hash(for: url) { hashes.append(h) }
+                            }
                             return (i, hashes)
                         }
                     }
